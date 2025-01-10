@@ -30,6 +30,8 @@ const App: React.FC = () => {
         <div>
           <h2>{selectedMap.name}</h2>
           <h3>Proprietário: {selectedMap.owner}</h3>
+          <p>Aperte &#91; Z &#93; para alterar Zona</p>
+          <p>Aperte &#91; P &#93; para Parar de desenhar</p>
           <Canvas mapID={selectedMap.id} />
         </div>
       )}
