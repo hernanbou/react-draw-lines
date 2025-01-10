@@ -6,115 +6,14 @@ interface ImageDisplayProps {
 
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [lines, setLines] = useState<{ start: { x: number; y: number }; end: { x: number; y: number }; length: number }[]>([]);
+  const [lines, setLines] = useState<{ start: { x: number; y: number }; end: { x: number; y: number }; length: number; color: string }[]>([]);
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [currentColor, setCurrentColor] = useState<string>('#D80300');
   const imageUrl = `http://localhost:5000/maps/${mapID}/image`;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (canvas && ctx) {
-      const image = new Image();
-      image.src = imageUrl;
-
-      image.onload = () => {
-        canvas.width = image.width;
-        canvas.height = image.height;
-        ctx.drawImage(image, 0, 0);
-      };
-    }
-  }, [imageUrl]);
-
-  const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
-    return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (currentStart) {
-      // Finaliza a linha anterior e inicia uma nova
-      const length = calculateLineLength(currentStart, { x, y });
-      setLines([...lines, { start: currentStart, end: { x, y }, length: parseFloat(length) }]);
-      setCurrentStart({ x, y }); // Define o ponto final como o início da próxima linha
-    } else {
-      // Inicia a primeira linha
-      setCurrentStart({ x, y });
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!currentStart) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    setMousePos({ x, y });
-    drawTemporaryLine(x, y);
-  };
-
-  const drawTemporaryLine = (mouseX: number, mouseY: number) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx || !currentStart) return;
-  
-    const image = new Image();
-    image.src = imageUrl;
-  
-    image.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
-      ctx.drawImage(image, 0, 0); // Redesenha a imagem
-  
-      // Redesenha todas as linhas fixadas
-      lines.forEach((line, index) => {
-        // Desenha a linha
-        ctx.beginPath();
-        ctx.moveTo(line.start.x, line.start.y);
-        ctx.lineTo(line.end.x, line.end.y);
-        ctx.strokeStyle = index % 2 === 0 ? '#D80300' : '#39FF14';
-        ctx.lineWidth = 3; // Atualizado para o novo valor
-        ctx.stroke();
-      });
-  
-      // Desenha os pontos após as linhas fixadas
-      lines.forEach((line) => {
-        ctx.beginPath();
-        ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
-        ctx.fillStyle = '#FDEE2F';
-        ctx.fill();
-      });
-  
-      // Desenha a linha temporária
-      ctx.beginPath();
-      ctx.moveTo(currentStart.x, currentStart.y);
-      ctx.lineTo(mouseX, mouseY);
-      ctx.strokeStyle = lines.length % 2 === 0 ? '#D80300' : '#39FF14'; // Alterna as cores
-      ctx.lineWidth = 3; // Ajustado para o novo valor
-      ctx.stroke();
-  
-      // Desenha o ponto no início da linha temporária
-      ctx.beginPath();
-      ctx.arc(currentStart.x, currentStart.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
-      ctx.fillStyle = '#FDEE2F';
-      ctx.fill();
-    };
-  };
-
-  useEffect(() => {
-    drawLines();
-  }, [lines]);
-
-  const drawLines = () => {
+  // Função para redesenhar o canvas
+  const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -127,25 +26,138 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       ctx.drawImage(image, 0, 0); // Redesenha a imagem
   
       // Redesenha todas as linhas fixadas
-      lines.forEach((line, index) => {
-        // Desenha a linha
+      lines.forEach((line) => {
         ctx.beginPath();
         ctx.moveTo(line.start.x, line.start.y);
         ctx.lineTo(line.end.x, line.end.y);
-        ctx.strokeStyle = index % 2 === 0 ? '#D80300' : '#39FF14';
+        ctx.strokeStyle = line.color;
         ctx.lineWidth = 3; // Atualizado para o novo valor
         ctx.stroke();
       });
   
-      // Desenha os pontos após as linhas
+      // Redesenha os pontos após as linhas fixadas
       lines.forEach((line) => {
         ctx.beginPath();
         ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
         ctx.fillStyle = '#FDEE2F';
         ctx.fill();
       });
+  
+      // Desenha a linha temporária, se fornecida
+      if (tempLine) {
+        ctx.beginPath();
+        ctx.moveTo(tempLine.start.x, tempLine.start.y);
+        ctx.lineTo(tempLine.end.x, tempLine.end.y);
+        ctx.strokeStyle = tempLine.color;
+        ctx.lineWidth = 3; // Ajustado para o novo valor
+        ctx.stroke();
+  
+        // Desenha o ponto no início da linha temporária
+        ctx.beginPath();
+        ctx.arc(tempLine.start.x, tempLine.start.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
+        ctx.fillStyle = '#FDEE2F';
+        ctx.fill();
+      }
     };
   };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (canvas && ctx) {
+      const image = new Image();
+      image.src = imageUrl;
+
+      image.onload = () => {
+        canvas.width = image.width;
+        canvas.height = image.height;
+        ctx.drawImage(image, 0, 0);
+
+        // Redesenha as linhas fixadas após carregar a imagem
+        redrawCanvas();
+      };
+    }
+  }, [imageUrl]);
+
+  const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
+    return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
+  };
+
+  const finalizeLine = (x: number, y: number) => {
+    if (currentStart) {
+      const length = calculateLineLength(currentStart, { x, y });
+      setLines([...lines, { start: currentStart, end: { x, y }, length: parseFloat(length), color: currentColor }]);
+      setCurrentStart({ x, y }); // Define o ponto final como o início da próxima linha
+    } else {
+      setCurrentStart({ x, y });
+    }
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    finalizeLine(x, y);
+  };
+
+  const handleKeyPress = (e: KeyboardEvent) => {
+    if (e.key === 'z') {
+      setCurrentColor((prevColor) => (prevColor === '#D80300' ? '#39FF14' : '#D80300'));
+    } else if (e.key === 'p') {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) return;
+  
+      // Limpa o canvas e redesenha as linhas fixadas
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
+      redrawCanvas(); // Redesenha as linhas fixadas
+  
+      // Reseta os estados para garantir que a linha temporária seja removida
+      setCurrentStart(null);
+      setMousePos(null);
+  
+      // Reseta a cor para o padrão
+      setCurrentColor('#D80300');
+  
+      // Força uma atualização do componente para garantir o redesenho imediato
+      setLines([...lines]);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!currentStart) return;
+  
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+  
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+  
+    setMousePos({ x, y });
+    drawTemporaryLine(x, y);
+  };
+
+  const drawTemporaryLine = (mouseX: number, mouseY: number) => {
+    if (currentStart) {
+      redrawCanvas({
+        start: currentStart,
+        end: { x: mouseX, y: mouseY },
+        color: currentColor,
+      });
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [lines, currentStart, mousePos]);
 
   return (
     <div>
