@@ -4,13 +4,13 @@ interface ImageDisplayProps {
   mapID: number;
 }
 
-const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
+const Canvas1: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [lines, setLines] = useState<{ start: { x: number; y: number }; end: { x: number; y: number }; length: number; color: string }[]>([]);
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<string>('#D80300');
-  const imageUrl = `/api/maps/${mapID}/original_image`;
+  const imageUrl = `http://localhost:5000/maps/${mapID}/original_image`;
 
   // Função para redesenhar o canvas
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
@@ -61,35 +61,27 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     };
   };
 
-useEffect(() => {
-  const canvas = canvasRef.current;
-  const ctx = canvas?.getContext('2d');
-  if (canvas && ctx) {
-    const image = new Image();
-    image.crossOrigin = "Anonymous";  // Permitir o carregamento da imagem sem "contaminar" o canvas
-    image.src = imageUrl;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (canvas && ctx) {
+      const image = new Image();
+      image.src = imageUrl;
 
-    image.onload = () => {
-      canvas.width = image.width;
-      canvas.height = image.height;
-      ctx.drawImage(image, 0, 0);
+      image.onload = () => {
+        canvas.width = image.width;
+        canvas.height = image.height;
+        ctx.drawImage(image, 0, 0);
 
-      // Redesenhar as linhas fixadas após carregar a imagem
-      redrawCanvas();
-    };
+        // Redesenha as linhas fixadas após carregar a imagem
+        redrawCanvas();
+      };
+    }
+  }, [imageUrl]);
 
-    image.onerror = () => {
-      console.error("Erro ao carregar a imagem.");
-    };
-  }
-}, [imageUrl]);  // Atualiza sempre que imageUrl mudar
-
-console.log(`Carregando imagem de: ${imageUrl}`);
-  
-
-const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
-  return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
-};
+  const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
+    return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
+  };
 
   const finalizeLine = (x: number, y: number) => {
     if (currentStart) {
@@ -167,34 +159,6 @@ const calculateLineLength = (start: { x: number; y: number }, end: { x: number; 
     };
   }, [lines, currentStart, mousePos]);
 
-  const saveCanvasAndLinesToAPI = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-  
-    try {
-      const imageBase64 = canvas.toDataURL('image/png'); // Converte o canvas para uma string base64
-      console.log(imageBase64)
-      const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          zone_image: imageBase64,
-          line_list: lines.map(line => line.length), // Apenas os comprimentos das linhas
-        }),
-      });
-  
-      if (response.ok) {
-        console.log('Canvas e linhas salvos com sucesso na API!');
-      } else {
-        console.error('Erro ao salvar canvas e linhas:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Erro ao salvar canvas e linhas:', error);
-    }
-  };  
-
   return (
     <div>
       <canvas
@@ -210,13 +174,8 @@ const calculateLineLength = (start: { x: number; y: number }, end: { x: number; 
           </div>
         ))}
       </div>
-      <div style={{ marginTop: '20px' }}>
-        <button onClick={saveCanvasAndLinesToAPI} style={{ padding: '10px 20px', backgroundColor: '#4CAF50', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-          Salvar Canvas e Linhas
-        </button>
-      </div>
     </div>
   );
 };
 
-export default Canvas;
+export default Canvas1;

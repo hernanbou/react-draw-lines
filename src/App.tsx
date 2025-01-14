@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import MapSelector from "./pages/MapSelector";
 import Canvas from "./components/Canvas";
+import Canvas1 from "./components/Canvas copy"
 
 interface Map {
   id: number;
@@ -32,7 +33,7 @@ const App: React.FC = () => {
           <h3>Proprietário: {selectedMap.owner}</h3>
           <p>Aperte &#91; Z &#93; para alterar Zona</p>
           <p>Aperte &#91; P &#93; para Parar de desenhar</p>
-          <Canvas mapID={selectedMap.id} />
+          <Canvas1 mapID={selectedMap.id} />
         </div>
       )}
     </div>
