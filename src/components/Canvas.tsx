@@ -10,9 +10,8 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<string>('#D80300');
-  const imageUrl = `/api/maps/${mapID}/original_image`;
+  const imageUrl = `http://localhost:5000/maps/${mapID}/original_image`;
 
-  // Função para redesenhar o canvas
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -20,12 +19,12 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   
     const image = new Image();
     image.src = imageUrl;
+    image.crossOrigin = 'anonymous'; // Adicione isso
   
     image.onload = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
       ctx.drawImage(image, 0, 0); // Redesenha a imagem
   
-      // Redesenha todas as linhas fixadas
       lines.forEach((line) => {
         ctx.beginPath();
         ctx.moveTo(line.start.x, line.start.y);
@@ -35,7 +34,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         ctx.stroke();
       });
   
-      // Redesenha os pontos após as linhas fixadas
       lines.forEach((line) => {
         ctx.beginPath();
         ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
@@ -43,7 +41,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         ctx.fill();
       });
   
-      // Desenha a linha temporária, se fornecida
       if (tempLine) {
         ctx.beginPath();
         ctx.moveTo(tempLine.start.x, tempLine.start.y);
@@ -52,7 +49,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         ctx.lineWidth = 3; // Ajustado para o novo valor
         ctx.stroke();
   
-        // Desenha o ponto no início da linha temporária
         ctx.beginPath();
         ctx.arc(tempLine.start.x, tempLine.start.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
         ctx.fillStyle = '#FDEE2F';
@@ -61,41 +57,32 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     };
   };
 
-useEffect(() => {
-  const canvas = canvasRef.current;
-  const ctx = canvas?.getContext('2d');
-  if (canvas && ctx) {
-    const image = new Image();
-    image.crossOrigin = "Anonymous";  // Permitir o carregamento da imagem sem "contaminar" o canvas
-    image.src = imageUrl;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (canvas && ctx) {
+      const img = new Image();
+      img.src = imageUrl;
+      img.crossOrigin = 'anonymous'; // Adicione isso
 
-    image.onload = () => {
-      canvas.width = image.width;
-      canvas.height = image.height;
-      ctx.drawImage(image, 0, 0);
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        redrawCanvas();
+      };
+    }
+  }, [imageUrl]);
 
-      // Redesenhar as linhas fixadas após carregar a imagem
-      redrawCanvas();
-    };
-
-    image.onerror = () => {
-      console.error("Erro ao carregar a imagem.");
-    };
-  }
-}, [imageUrl]);  // Atualiza sempre que imageUrl mudar
-
-console.log(`Carregando imagem de: ${imageUrl}`);
-  
-
-const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
-  return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
-};
+  const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
+    return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
+  };
 
   const finalizeLine = (x: number, y: number) => {
     if (currentStart) {
       const length = calculateLineLength(currentStart, { x, y });
       setLines([...lines, { start: currentStart, end: { x, y }, length: parseFloat(length), color: currentColor }]);
-      setCurrentStart({ x, y }); // Define o ponto final como o início da próxima linha
+      setCurrentStart({ x, y });
     } else {
       setCurrentStart({ x, y });
     }
@@ -120,18 +107,11 @@ const calculateLineLength = (start: { x: number; y: number }, end: { x: number; 
       const ctx = canvas?.getContext('2d');
       if (!canvas || !ctx) return;
   
-      // Limpa o canvas e redesenha as linhas fixadas
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
-      redrawCanvas(); // Redesenha as linhas fixadas
-  
-      // Reseta os estados para garantir que a linha temporária seja removida
+      ctx.clearRect(0, 0, canvas.width, canvas.height); 
+      redrawCanvas(); 
       setCurrentStart(null);
       setMousePos(null);
-  
-      // Reseta a cor para o padrão
       setCurrentColor('#D80300');
-  
-      // Força uma atualização do componente para garantir o redesenho imediato
       setLines([...lines]);
     }
   };
@@ -167,33 +147,30 @@ const calculateLineLength = (start: { x: number; y: number }, end: { x: number; 
     };
   }, [lines, currentStart, mousePos]);
 
-  const saveCanvasAndLinesToAPI = async () => {
+  const saveCanvasAsBlob = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-  
-    try {
-      const imageBase64 = canvas.toDataURL('image/png'); // Converte o canvas para uma string base64
-      console.log(imageBase64)
-      const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      
+      const formData = new FormData();
+      formData.append('image', blob);
+      const lineLengths = lines.map(line => line.length);
+      formData.append('lines', JSON.stringify(lineLengths));
+
+      const response = await fetch(`http://localhost:5000/maps/${mapID}/save_image`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          zone_image: imageBase64,
-          line_list: lines.map(line => line.length), // Apenas os comprimentos das linhas
-        }),
+        body: formData,
       });
-  
+
       if (response.ok) {
-        console.log('Canvas e linhas salvos com sucesso na API!');
+        console.log('Imagem e linhas salvas com sucesso!');
       } else {
-        console.error('Erro ao salvar canvas e linhas:', response.statusText);
+        console.error('Erro ao salvar imagem e linhas.');
       }
-    } catch (error) {
-      console.error('Erro ao salvar canvas e linhas:', error);
-    }
-  };  
+    }, 'image/png');
+  };
 
   return (
     <div>
@@ -210,11 +187,7 @@ const calculateLineLength = (start: { x: number; y: number }, end: { x: number; 
           </div>
         ))}
       </div>
-      <div style={{ marginTop: '20px' }}>
-        <button onClick={saveCanvasAndLinesToAPI} style={{ padding: '10px 20px', backgroundColor: '#4CAF50', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-          Salvar Canvas e Linhas
-        </button>
-      </div>
+      <button onClick={saveCanvasAsBlob}>Salvar Imagem</button>
     </div>
   );
 };
