@@ -19,24 +19,24 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   
     const image = new Image();
     image.src = imageUrl;
-    image.crossOrigin = 'anonymous'; // Adicione isso
+    image.crossOrigin = 'anonymous';
   
     image.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
-      ctx.drawImage(image, 0, 0); // Redesenha a imagem
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // limpa o canvas
+      ctx.drawImage(image, 0, 0); // redesenha a imagem
   
       lines.forEach((line) => {
         ctx.beginPath();
         ctx.moveTo(line.start.x, line.start.y);
         ctx.lineTo(line.end.x, line.end.y);
         ctx.strokeStyle = line.color;
-        ctx.lineWidth = 3; // Atualizado para o novo valor
+        ctx.lineWidth = 3; // valor da largura do vetor
         ctx.stroke();
       });
   
       lines.forEach((line) => {
         ctx.beginPath();
-        ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
+        ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // valor do raio do ponto
         ctx.fillStyle = '#FDEE2F';
         ctx.fill();
       });
@@ -46,11 +46,11 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         ctx.moveTo(tempLine.start.x, tempLine.start.y);
         ctx.lineTo(tempLine.end.x, tempLine.end.y);
         ctx.strokeStyle = tempLine.color;
-        ctx.lineWidth = 3; // Ajustado para o novo valor
+        ctx.lineWidth = 3; // valor da largura do vetor
         ctx.stroke();
   
         ctx.beginPath();
-        ctx.arc(tempLine.start.x, tempLine.start.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
+        ctx.arc(tempLine.start.x, tempLine.start.y, 4, 0, Math.PI * 2); // valor do raio do ponto
         ctx.fillStyle = '#FDEE2F';
         ctx.fill();
       }
@@ -63,7 +63,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     if (canvas && ctx) {
       const img = new Image();
       img.src = imageUrl;
-      img.crossOrigin = 'anonymous'; // Adicione isso
+      img.crossOrigin = 'anonymous'; 
 
       img.onload = () => {
         canvas.width = img.width;
