@@ -10,9 +10,8 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<string>('#D80300');
-  const imageUrl = `http://localhost:5000/maps/${mapID}/image`;
+  const imageUrl = `http://localhost:5000/maps/${mapID}/original_image`;
 
-  // Função para redesenhar o canvas
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -20,41 +19,38 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   
     const image = new Image();
     image.src = imageUrl;
+    image.crossOrigin = 'anonymous';
   
     image.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
-      ctx.drawImage(image, 0, 0); // Redesenha a imagem
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // limpa o canvas
+      ctx.drawImage(image, 0, 0); // redesenha a imagem
   
-      // Redesenha todas as linhas fixadas
       lines.forEach((line) => {
         ctx.beginPath();
         ctx.moveTo(line.start.x, line.start.y);
         ctx.lineTo(line.end.x, line.end.y);
         ctx.strokeStyle = line.color;
-        ctx.lineWidth = 3; // Atualizado para o novo valor
+        ctx.lineWidth = 3; // valor da largura do vetor
         ctx.stroke();
       });
   
-      // Redesenha os pontos após as linhas fixadas
       lines.forEach((line) => {
         ctx.beginPath();
-        ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
+        ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // valor do raio do ponto
         ctx.fillStyle = '#FDEE2F';
         ctx.fill();
       });
   
-      // Desenha a linha temporária, se fornecida
       if (tempLine) {
         ctx.beginPath();
         ctx.moveTo(tempLine.start.x, tempLine.start.y);
         ctx.lineTo(tempLine.end.x, tempLine.end.y);
         ctx.strokeStyle = tempLine.color;
-        ctx.lineWidth = 3; // Ajustado para o novo valor
+        ctx.lineWidth = 3; // valor da largura do vetor
         ctx.stroke();
   
-        // Desenha o ponto no início da linha temporária
         ctx.beginPath();
-        ctx.arc(tempLine.start.x, tempLine.start.y, 4, 0, Math.PI * 2); // Ajustado para o novo raio
+        ctx.arc(tempLine.start.x, tempLine.start.y, 4, 0, Math.PI * 2); // valor do raio do ponto
         ctx.fillStyle = '#FDEE2F';
         ctx.fill();
       }
@@ -65,15 +61,14 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (canvas && ctx) {
-      const image = new Image();
-      image.src = imageUrl;
+      const img = new Image();
+      img.src = imageUrl;
+      img.crossOrigin = 'anonymous'; 
 
-      image.onload = () => {
-        canvas.width = image.width;
-        canvas.height = image.height;
-        ctx.drawImage(image, 0, 0);
-
-        // Redesenha as linhas fixadas após carregar a imagem
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
         redrawCanvas();
       };
     }
@@ -87,7 +82,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     if (currentStart) {
       const length = calculateLineLength(currentStart, { x, y });
       setLines([...lines, { start: currentStart, end: { x, y }, length: parseFloat(length), color: currentColor }]);
-      setCurrentStart({ x, y }); // Define o ponto final como o início da próxima linha
+      setCurrentStart({ x, y });
     } else {
       setCurrentStart({ x, y });
     }
@@ -112,18 +107,11 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       const ctx = canvas?.getContext('2d');
       if (!canvas || !ctx) return;
   
-      // Limpa o canvas e redesenha as linhas fixadas
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
-      redrawCanvas(); // Redesenha as linhas fixadas
-  
-      // Reseta os estados para garantir que a linha temporária seja removida
+      ctx.clearRect(0, 0, canvas.width, canvas.height); 
+      redrawCanvas(); 
       setCurrentStart(null);
       setMousePos(null);
-  
-      // Reseta a cor para o padrão
       setCurrentColor('#D80300');
-  
-      // Força uma atualização do componente para garantir o redesenho imediato
       setLines([...lines]);
     }
   };
@@ -159,6 +147,31 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     };
   }, [lines, currentStart, mousePos]);
 
+  const saveCanvasAsBlob = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      
+      const formData = new FormData();
+      formData.append('image', blob);
+      const lineLengths = lines.map(line => line.length);
+      formData.append('lines', JSON.stringify(lineLengths));
+
+      const response = await fetch(`http://localhost:5000/maps/${mapID}/save_image`, {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (response.ok) {
+        console.log('Imagem e linhas salvas com sucesso!');
+      } else {
+        console.error('Erro ao salvar imagem e linhas.');
+      }
+    }, 'image/png');
+  };
+
   return (
     <div>
       <canvas
@@ -174,6 +187,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
           </div>
         ))}
       </div>
+      <button onClick={saveCanvasAsBlob}>Salvar Imagem</button>
     </div>
   );
 };
