@@ -1,16 +1,29 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 
 interface ImageDisplayProps {
   mapID: number;
 }
 
+interface MapData {
+  id: number;
+  zone_image:string;
+  original_image: string;
+}
+
+interface Line {
+  start?: {x: number; y:number};
+  end?: {x: number; y:number};
+  length: number;
+  color?: string;
+}
+
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [lines, setLines] = useState<{ start: { x: number; y: number }; end: { x: number; y: number }; length: number; color: string }[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<string>('#D80300');
-  const imageUrl = `http://localhost:5000/maps/${mapID}/original_image`;
+  const [imageUrl, setImageUrl] = useState<string>('');
 
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
@@ -26,20 +39,24 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       ctx.drawImage(image, 0, 0); // redesenha a imagem
   
       lines.forEach((line) => {
-        ctx.beginPath();
-        ctx.moveTo(line.start.x, line.start.y);
-        ctx.lineTo(line.end.x, line.end.y);
-        ctx.strokeStyle = line.color;
-        ctx.lineWidth = 3; // valor da largura do vetor
-        ctx.stroke();
+        if (line.start && line.end) {
+          ctx.beginPath();
+          ctx.moveTo(line.start.x, line.start.y);
+          ctx.lineTo(line.end.x, line.end.y);
+          ctx.strokeStyle = line.color || '#D80300';
+          ctx.lineWidth = 3; // valor da largura do vetor
+          ctx.stroke();
+        }
       });
-  
+      
       lines.forEach((line) => {
-        ctx.beginPath();
-        ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // valor do raio do ponto
-        ctx.fillStyle = '#FDEE2F';
-        ctx.fill();
-      });
+        if (line.end) {
+          ctx.beginPath();
+          ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // valor do raio do ponto
+          ctx.fillStyle = '#FDEE2F';
+          ctx.fill();
+        }
+      });      
   
       if (tempLine) {
         ctx.beginPath();
@@ -56,23 +73,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       }
     };
   };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (canvas && ctx) {
-      const img = new Image();
-      img.src = imageUrl;
-      img.crossOrigin = 'anonymous'; 
-
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        redrawCanvas();
-      };
-    }
-  }, [imageUrl]);
 
   const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
     return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
@@ -102,7 +102,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'z') {
       setCurrentColor((prevColor) => (prevColor === '#D80300' ? '#39FF14' : '#D80300'));
-    } else if (e.key === 'p') {
+    } else if (e.key === 'x') {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
       if (!canvas || !ctx) return;
@@ -140,6 +140,69 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     }
   };
 
+  const saveCanvas = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+  
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+  
+      const formData = new FormData();
+      formData.append('image', blob);
+      const lineLengths = lines.map(line => line.length);
+  
+      formData.append('lines', JSON.stringify(lineLengths));
+  
+      const response = await fetch(`http://localhost:5000/maps/${mapID}/save_image`, {
+        method: 'PUT',
+        body: formData,
+      });
+  
+      if (response.ok) {
+        console.log('Imagem e linhas salvas com sucesso!');
+      } else {
+        console.error('Erro ao salvar imagem e linhas.');
+      }
+    }, 'image/png');
+  };    
+  
+  const fetchMapData = useCallback(async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/maps/${mapID}`);
+      const mapData: MapData = await response.json();
+  
+      const url = mapData.zone_image
+        ? `http://localhost:5000/maps/${mapID}/zone_image`
+        : `http://localhost:5000/maps/${mapID}/original_image`;
+  
+      setImageUrl(url);
+    } catch (error) {
+      console.error('Erro ao buscar dados do mapa', error);
+    }
+  }, [mapID]);
+  
+  const fetchLineList = useCallback(async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/maps/${mapID}/line_list`);
+      const lineData: number[] = await response.json();
+  
+      const newLines = lineData.map((length) => ({
+        length,
+      }));
+      setLines(newLines);
+    } catch (error) {
+      console.error('Erro ao buscar lista de vetores', error);
+    }
+  }, [mapID, setLines]);
+  
+  useEffect(() => {
+    fetchMapData();
+    fetchLineList();
+    setLines([]);
+    setCurrentStart(null);
+    setMousePos(null);
+  }, [fetchMapData, fetchLineList]);    
+
   useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
     return () => {
@@ -147,30 +210,22 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     };
   }, [lines, currentStart, mousePos]);
 
-  const saveCanvasAsBlob = async () => {
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const ctx = canvas?.getContext('2d');
+    if (canvas && ctx) {
+      const img = new Image();
+      img.src = imageUrl;
+      img.crossOrigin = 'anonymous'; 
 
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      
-      const formData = new FormData();
-      formData.append('image', blob);
-      const lineLengths = lines.map(line => line.length);
-      formData.append('lines', JSON.stringify(lineLengths));
-
-      const response = await fetch(`http://localhost:5000/maps/${mapID}/save_image`, {
-        method: 'PUT',
-        body: formData,
-      });
-
-      if (response.ok) {
-        console.log('Imagem e linhas salvas com sucesso!');
-      } else {
-        console.error('Erro ao salvar imagem e linhas.');
-      }
-    }, 'image/png');
-  };
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        redrawCanvas();
+      };
+    }
+  }, [imageUrl]);
 
   return (
     <div>
@@ -181,13 +236,15 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         onMouseMove={handleMouseMove}
       />
       <div style={{ marginTop: '10px' }}>
-        {lines.map((line, index) => (
-          <div key={index}>
-            Linha {index + 1}: {line.length} px
+        {lines.length === 0
+        ? <div>Nenhuma lista de vetores disponivel. Traçe os vetores.</div>
+        : lines.map((line, i) =>(
+          <div key={i}>
+            Linha {i + 1} : {line.length} px
           </div>
         ))}
       </div>
-      <button onClick={saveCanvasAsBlob}>Salvar Imagem</button>
+      <button onClick={saveCanvas}>Salvar Imagem</button>
     </div>
   );
 };
