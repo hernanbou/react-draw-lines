@@ -194,13 +194,17 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       console.error('Erro ao buscar lista de vetores', error);
     }
   }, [mapID, setLines]);
+
+  const resetStates = () => {
+    setLines([]);
+    setCurrentStart(null);
+    setMousePos(null);
+  };
   
   useEffect(() => {
     fetchMapData();
     fetchLineList();
-    setLines([]);
-    setCurrentStart(null);
-    setMousePos(null);
+    resetStates();
   }, [fetchMapData, fetchLineList]);    
 
   useEffect(() => {
