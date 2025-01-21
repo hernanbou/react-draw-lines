@@ -1,0 +1,21 @@
+
+
+.canvas-container {
+    position: relative;
+}
+
+.canvas-container canvas{
+    border: 1px solid black;
+    cursor: url('../utils/target-cursor.svg') 24 24, auto;
+}
+
+.calibration-point{
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #4b0082;
+    position: absolute;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    display: none;
+}
