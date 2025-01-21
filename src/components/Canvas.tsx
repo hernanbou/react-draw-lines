@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import '../styles/canvas.css';
 
 interface ImageDisplayProps {
   mapID: number;
@@ -17,13 +18,22 @@ interface Line {
   color?: string;
 }
 
+interface Dot {
+  x: number;
+  y: number;
+}
+
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<string>('#D80300');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [fixedPoints, setFixedPoints] = useState<Dot[]>([])
+  const [triggerRedraw, setTriggerRedraw] = useState<boolean>(false);
 
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
@@ -48,7 +58,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
           ctx.stroke();
         }
       });
-      
+  
       lines.forEach((line) => {
         if (line.end) {
           ctx.beginPath();
@@ -56,7 +66,14 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
           ctx.fillStyle = '#FDEE2F';
           ctx.fill();
         }
-      });      
+      });
+  
+      fixedPoints.forEach(point => {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2); // valor do raio do ponto
+        ctx.fillStyle = '#4B0082';
+        ctx.fill();
+      });
   
       if (tempLine) {
         ctx.beginPath();
@@ -72,7 +89,15 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         ctx.fill();
       }
     };
-  };
+  };  
+
+  const isMouseOverLine = (x: number, y: number, line: Line): boolean => {
+    const distance = Math.sqrt(Math.pow(line.end!.x - line.start!.x, 2) + Math.pow(line.end!.y - line.start!.y, 2));
+    const distanceToStart = Math.sqrt(Math.pow(x - line.start!.x, 2) + Math.pow(y - line.start!.y, 2));
+    const distanceToEnd = Math.sqrt(Math.pow(x - line.end!.x, 2) + Math.pow(y - line.end!.y, 2));
+    
+    return Math.abs(distance - (distanceToStart + distanceToEnd)) < 0.5;
+  };  
 
   const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
     return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
@@ -83,10 +108,11 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       const length = calculateLineLength(currentStart, { x, y });
       setLines([...lines, { start: currentStart, end: { x, y }, length: parseFloat(length), color: currentColor }]);
       setCurrentStart({ x, y });
+      setIsDrawing(true);
     } else {
       setCurrentStart({ x, y });
     }
-  };
+  };  
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -107,27 +133,56 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       const ctx = canvas?.getContext('2d');
       if (!canvas || !ctx) return;
   
-      ctx.clearRect(0, 0, canvas.width, canvas.height); 
-      redrawCanvas(); 
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      redrawCanvas();
       setCurrentStart(null);
       setMousePos(null);
       setCurrentColor('#D80300');
       setLines([...lines]);
+      setIsDrawing(false);
+    } else if (e.key === 'c' && mousePos) {
+      setFixedPoints((prevPoints) => {
+        const newPoints = [...prevPoints, mousePos];
+        return newPoints;
+      });
+      setTriggerRedraw(true);
     }
-  };
+  };     
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!currentStart) return;
-  
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>): void => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-  
+    const cursor = cursorRef.current;
+    if (!canvas || !cursor) return;
+
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-  
+
     setMousePos({ x, y });
-    drawTemporaryLine(x, y);
+
+    if (currentStart) {
+      drawTemporaryLine(x, y);
+      cursor.style.display = 'block';
+      cursor.style.left = `${x}px`;
+      cursor.style.top = `${y}px`;
+
+      const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
+      if (isOverLine) {
+        cursor.style.backgroundColor = '#4B0082';
+      } else {
+        cursor.style.display = 'none';
+      }
+    } else {
+      const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
+      if (isOverLine && !isDrawing) {
+        cursor.style.display = 'block';
+        cursor.style.left = `${x}px`;
+        cursor.style.top = `${y}px`;
+        cursor.style.backgroundColor = '#4B0082';
+      } else {
+        cursor.style.display = 'none';
+      }
+    }
   };
 
   const drawTemporaryLine = (mouseX: number, mouseY: number) => {
@@ -143,21 +198,21 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const saveCanvas = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-  
+
     canvas.toBlob(async (blob) => {
       if (!blob) return;
-  
+
       const formData = new FormData();
       formData.append('image', blob);
       const lineLengths = lines.map(line => line.length);
-  
+
       formData.append('lines', JSON.stringify(lineLengths));
-  
+
       const response = await fetch(`http://localhost:5000/maps/${mapID}/save_image`, {
         method: 'PUT',
         body: formData,
       });
-  
+
       if (response.ok) {
         console.log('Imagem e linhas salvas com sucesso!');
       } else {
@@ -165,27 +220,27 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       }
     }, 'image/png');
   };    
-  
+
   const fetchMapData = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}`);
       const mapData: MapData = await response.json();
-  
+
       const url = mapData.zone_image
         ? `http://localhost:5000/maps/${mapID}/zone_image`
         : `http://localhost:5000/maps/${mapID}/original_image`;
-  
+
       setImageUrl(url);
     } catch (error) {
       console.error('Erro ao buscar dados do mapa', error);
     }
   }, [mapID]);
-  
+
   const fetchLineList = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}/line_list`);
       const lineData: number[] = await response.json();
-  
+
       const newLines = lineData.map((length) => ({
         length,
       }));
@@ -197,10 +252,18 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
   const resetStates = () => {
     setLines([]);
+    setFixedPoints([]);
     setCurrentStart(null);
     setMousePos(null);
   };
-  
+
+  useEffect(() => {
+    if (triggerRedraw) {
+      redrawCanvas();
+      setTriggerRedraw(false);
+    }
+  }, [triggerRedraw]);  
+
   useEffect(() => {
     fetchMapData();
     fetchLineList();
@@ -212,7 +275,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [lines, currentStart, mousePos]);
+  }, [lines, currentStart, mousePos, fixedPoints]);  
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -220,7 +283,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     if (canvas && ctx) {
       const img = new Image();
       img.src = imageUrl;
-      img.crossOrigin = 'anonymous'; 
+      img.crossOrigin = 'anonymous';
 
       img.onload = () => {
         canvas.width = img.width;
@@ -229,16 +292,23 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         redrawCanvas();
       };
     }
-  }, [imageUrl]);
+
+    const handleMouseMoveWrapper = (e: MouseEvent) => handleMouseMove(e as unknown as React.MouseEvent<HTMLCanvasElement>);
+    canvas?.addEventListener('mousemove', handleMouseMoveWrapper);
+
+    return () => {
+      canvas?.removeEventListener('mousemove', handleMouseMoveWrapper);
+    };
+  }, [imageUrl]);  
 
   return (
-    <div>
+    <div className="canvas-container">
       <canvas
         ref={canvasRef}
-        style={{ border: '1px solid black', cursor: 'crosshair' }}
         onClick={handleCanvasClick}
         onMouseMove={handleMouseMove}
       />
+      <div ref={cursorRef} className="calibration-point" />
       <div style={{ marginTop: '10px' }}>
         {lines.length === 0
         ? <div>Nenhuma lista de vetores disponivel. Traçe os vetores.</div>

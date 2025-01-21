@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import MapSelector from "./pages/MapSelector";
 import Canvas from "./components/Canvas";
 
+
 interface Map {
   id: number;
   owner: string;
@@ -31,7 +32,8 @@ const App: React.FC = () => {
           <h2>{selectedMap.name}</h2>
           <h3>Proprietário: {selectedMap.owner}</h3>
           <p>Aperte &#91; Z &#93; para alterar Zona</p>
-          <p>Aperte &#91; X &#93; para Parar de desenhar</p>
+          <p>Aperte &#91; X &#93; para parar de desenhar</p>
+          <p>Aperte &#91; C &#93; para adicionar um Ponto de Calibração</p>
           <Canvas mapID={selectedMap.id} />
         </div>
       )}
