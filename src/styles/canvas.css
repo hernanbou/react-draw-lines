@@ -1,15 +1,25 @@
-
-
 .canvas-container {
+    display: block; /* Alterado de flex para block */
     position: relative;
+    align-items: center; /* Remover se display não for flex */
 }
 
-.canvas-container canvas{
+.canvas-container canvas {
+    position: relative;
     border: 1px solid black;
     cursor: url('../utils/target-cursor.svg') 24 24, auto;
 }
 
-.calibration-point{
+.canvas-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.calibration-point {
     width: 8px;
     height: 8px;
     border-radius: 50%;
@@ -18,4 +28,71 @@
     pointer-events: none;
     transform: translate(-50%, -50%);
     display: none;
+}
+
+.info-container {
+    display: flex;
+    margin-top: 10px;
+}
+
+.line-info,
+.dots-info {
+    margin: 0 10px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+.line-info div,
+.dots-info div {
+    margin-bottom: 5px;
+}
+
+.dots-container {
+    display: flex;
+    align-items: center;
+    border: 1px solid #d1d1d1;
+    padding: 0 10px;
+    gap: 10px;
+}
+
+.dots-container div {
+    border: 1px solid #d1d1d1;
+    padding: 0 5px;
+}
+
+.dot-input {
+    width: 60px;
+    padding: 2px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    appearance: textfield;
+}
+
+.dot-input::-webkit-outer-spin-button,
+.dot-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.dot-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.canvas-container button {
+    margin-top: 10px;
+    padding: 10px 15px;
+    font-size: 16px;
+    color: #000;
+    background-color: #ccc;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.canvas-container button:hover {
+    background-color: #39FF14;
+    color: #000;
+    transition: 0.4s;
 }
