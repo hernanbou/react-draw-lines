@@ -18,21 +18,28 @@ interface Line {
   color?: string;
 }
 
-interface Dot {
+interface fixedDot {
   x: number;
   y: number;
+}
+
+interface Dot{
+  id: number;
+  lineIndex: number;
+  positionPx: number;
+  positionM:number;
 }
 
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
+  const [dots, setDots] = useState<Dot[]>([]);
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<string>('#D80300');
   const [imageUrl, setImageUrl] = useState<string>('');
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
-  const [fixedPoints, setFixedPoints] = useState<Dot[]>([])
   const [triggerRedraw, setTriggerRedraw] = useState<boolean>(false);
 
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
@@ -68,11 +75,19 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         }
       });
   
-      fixedPoints.forEach(point => {
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2); // valor do raio do ponto
-        ctx.fillStyle = '#4B0082';
-        ctx.fill();
+      dots.forEach(dot => {
+        const line = lines[dot.lineIndex];
+        if(line.start) {
+          const dx = line.end!.x - line.start.x;
+          const dy = line. end!.y - line.start.y;
+          const ratio = dot.positionPx / line.length;
+          const pointX = line.start.x + dx * ratio;
+          const pointY = line.start.y + dy * ratio;
+          ctx.beginPath();
+          ctx.arc(pointX, pointY, 4, 0, Math.PI * 2); // valor do raio do ponto
+          ctx.fillStyle = '#4B0082';
+          ctx.fill();
+        }
       });
   
       if (tempLine) {
@@ -96,7 +111,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     const distanceToStart = Math.sqrt(Math.pow(x - line.start!.x, 2) + Math.pow(y - line.start!.y, 2));
     const distanceToEnd = Math.sqrt(Math.pow(x - line.end!.x, 2) + Math.pow(y - line.end!.y, 2));
     
-    return Math.abs(distance - (distanceToStart + distanceToEnd)) < 0.5;
+    return Math.abs(distance - (distanceToStart + distanceToEnd)) < 0.01; //precisão de proximidade do mouse em relação ao vetor
   };  
 
   const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
@@ -141,12 +156,22 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       setLines([...lines]);
       setIsDrawing(false);
     } else if (e.key === 'c' && mousePos) {
-      setFixedPoints((prevPoints) => {
-        const newPoints = [...prevPoints, mousePos];
-        return newPoints;
-      });
-      setTriggerRedraw(true);
+      const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(mousePos.x, mousePos.y, line));
+      
+      if (lineUnderCursorIndex !== -1){
+        const line = lines[lineUnderCursorIndex];
+        const lengthToStart = Math.sqrt(Math.pow(mousePos.x - line.start!.x, 2) + Math.pow(mousePos.y - line.start!.y, 2)).toFixed(5);
+        const newDot: Dot = {
+          id:dots.length + 1,
+          lineIndex: lineUnderCursorIndex,
+          positionPx: parseFloat(lengthToStart),
+          positionM:0,
+        };
+        setDots((prevDots) => [...prevDots, newDot]);
+        setTriggerRedraw(true);
+      }
     }
+    console.log(dots)
   };     
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>): void => {
@@ -161,28 +186,37 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     setMousePos({ x, y });
 
     if (currentStart) {
-      drawTemporaryLine(x, y);
-      cursor.style.display = 'block';
-      cursor.style.left = `${x}px`;
-      cursor.style.top = `${y}px`;
-
-      const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
-      if (isOverLine) {
-        cursor.style.backgroundColor = '#4B0082';
-      } else {
-        cursor.style.display = 'none';
-      }
-    } else {
-      const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
-      if (isOverLine && !isDrawing) {
+        drawTemporaryLine(x, y);
         cursor.style.display = 'block';
         cursor.style.left = `${x}px`;
         cursor.style.top = `${y}px`;
-        cursor.style.backgroundColor = '#4B0082';
-      } else {
-        cursor.style.display = 'none';
-      }
+
+        const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
+        if (isOverLine) {
+            cursor.style.backgroundColor = '#4B0082';
+        } else {
+            cursor.style.display = 'none';
+        }
+    } else {
+        const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
+        if (isOverLine && !isDrawing) {
+            cursor.style.display = 'block';
+            cursor.style.left = `${x}px`;
+            cursor.style.top = `${y}px`;
+            cursor.style.backgroundColor = '#4B0082';
+        } else {
+            cursor.style.display = 'none';
+        }
     }
+  };
+
+  const handleDotInputChange = (e:React.ChangeEvent<HTMLInputElement>, dotID: number) => {
+    const newPositionM = parseFloat(e.target.value);
+    setDots((prevDots) =>
+      prevDots.map((dot) =>
+      dot.id === dotID ? {...dot, positionM: newPositionM} : dot
+      )
+    );
   };
 
   const drawTemporaryLine = (mouseX: number, mouseY: number) => {
@@ -252,7 +286,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
   const resetStates = () => {
     setLines([]);
-    setFixedPoints([]);
+    setDots([]);
     setCurrentStart(null);
     setMousePos(null);
   };
@@ -275,7 +309,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [lines, currentStart, mousePos, fixedPoints]);  
+  }, [lines, currentStart, mousePos, dots]);  
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -303,22 +337,52 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
   return (
     <div className="canvas-container">
-      <canvas
-        ref={canvasRef}
-        onClick={handleCanvasClick}
-        onMouseMove={handleMouseMove}
-      />
-      <div ref={cursorRef} className="calibration-point" />
-      <div style={{ marginTop: '10px' }}>
-        {lines.length === 0
-        ? <div>Nenhuma lista de vetores disponivel. Traçe os vetores.</div>
-        : lines.map((line, i) =>(
-          <div key={i}>
-            Linha {i + 1} : {line.length} px
-          </div>
-        ))}
-      </div>
-      <button onClick={saveCanvas}>Salvar Imagem</button>
+        <canvas
+            ref={canvasRef}
+            onClick={handleCanvasClick}
+            onMouseMove={handleMouseMove}
+        />
+        <div className="canvas-overlay">
+            <div ref={cursorRef} className="calibration-point" />
+        </div>
+        <div className="info-container">
+            <div className="line-info">
+                <div>
+                    {lines.length === 0
+                    ? <div>Nenhuma lista de vetores disponível. Trace os vetores.</div>
+                    : lines.map((line, i) =>(
+                        <div key={i}>
+                            Linha {i + 1} : {line.length} px
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className='dots-info'>
+                <div>
+                    {dots.length === 0
+                    ? <div>Nenhum ponto foi adicionado.</div>
+                    : dots.map((dot, i) =>(
+                        <div key={i} className='dots-container'>
+                            <div>Ponto {dot.id}:</div>
+                            <div>Vetor número {dot.lineIndex + 1}</div>
+                            <div>Posição do Ponto em relação ao vetor: {dot.positionPx}px</div>
+                            <div>
+                                <p>Digite o valor em metros: </p>
+                                <input 
+                                    type="number"
+                                    min="0"
+                                    value={dot.positionM}
+                                    onChange={(e) => handleDotInputChange(e, dot.id)}
+                                    placeholder='Metros'
+                                    className='dot-input'
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+        <button onClick={saveCanvas}>Salvar Imagem</button>
     </div>
   );
 };
