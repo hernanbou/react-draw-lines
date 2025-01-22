@@ -1,7 +1,7 @@
 .canvas-container {
-    display: block; /* Alterado de flex para block */
+    display: block;
     position: relative;
-    align-items: center; /* Remover se display não for flex */
+    align-items: center;
 }
 
 .canvas-container canvas {
