@@ -18,11 +18,6 @@ interface Line {
   color?: string;
 }
 
-interface fixedDot {
-  x: number;
-  y: number;
-}
-
 interface Dot{
   id: number;
   lineIndex: number;
@@ -170,9 +165,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         setDots((prevDots) => [...prevDots, newDot]);
         setTriggerRedraw(true);
       }
+      console.log(dots)
     }
-    console.log(dots)
-  };     
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>): void => {
     const canvas = canvasRef.current;
@@ -229,31 +224,81 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     }
   };
 
-  const saveCanvas = async () => {
-    const canvas = canvasRef.current;
+  const saveImage = async (canvas: HTMLCanvasElement | null) => {
     if (!canvas) return;
-
+  
     canvas.toBlob(async (blob) => {
       if (!blob) return;
-
+  
       const formData = new FormData();
       formData.append('image', blob);
-      const lineLengths = lines.map(line => line.length);
-
-      formData.append('lines', JSON.stringify(lineLengths));
-
-      const response = await fetch(`http://localhost:5000/maps/${mapID}/save_image`, {
-        method: 'PUT',
-        body: formData,
-      });
-
-      if (response.ok) {
-        console.log('Imagem e linhas salvas com sucesso!');
-      } else {
-        console.error('Erro ao salvar imagem e linhas.');
+  
+      try {
+        const response = await fetch(`http://localhost:5000/maps/${mapID}/save_image`, {
+          method: 'PUT',
+          body: formData,
+        });
+  
+        if (response.ok) {
+          console.log('Imagem salva com sucesso!');
+        } else {
+          console.error('Erro ao salvar imagem:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Erro ao salvar imagem:', error);
       }
     }, 'image/png');
-  };    
+  };  
+
+  const saveLines = async () => {
+    const lineLengths = lines.map(line => line.length);
+  
+    try {
+      const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ line_list: lineLengths }),
+      });
+  
+      if (response.ok) {
+        console.log('Vetores salvas com sucesso!');
+      } else {
+        console.error('Erro ao salvar vetores:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar vetores:', error);
+    }
+  };   
+
+  const saveDots = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ point_list: dots }),
+      });
+  
+      if (response.ok) {
+        console.log('Pontos salvos com sucesso!');
+      } else {
+        console.error('Erro ao salvar pontos:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar pontos:', error);
+    }
+  };
+  
+  const handleSave = () => {
+    const canvas = canvasRef.current;
+
+    saveImage(canvas);
+    saveLines();
+    saveDots();
+  };
 
   const fetchMapData = useCallback(async () => {
     try {
@@ -284,6 +329,17 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     }
   }, [mapID, setLines]);
 
+  const fetchPointList = useCallback(async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/maps/${mapID}/point_list`);
+      const pointData: Dot[] = await response.json();
+      
+      setDots(pointData);
+    } catch (error) {
+      console.error('Erro ao buscar lista de pontos', error);
+    }
+  }, [mapID, setDots]);  
+
   const resetStates = () => {
     setLines([]);
     setDots([]);
@@ -301,8 +357,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   useEffect(() => {
     fetchMapData();
     fetchLineList();
+    fetchPointList();
     resetStates();
-  }, [fetchMapData, fetchLineList]);    
+  }, [fetchMapData, fetchLineList, fetchPointList]);    
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
@@ -358,31 +415,33 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
                 </div>
             </div>
             <div className='dots-info'>
-                <div>
-                    {dots.length === 0
-                    ? <div>Nenhum ponto foi adicionado.</div>
-                    : dots.map((dot, i) =>(
-                        <div key={i} className='dots-container'>
-                            <div>Ponto {dot.id}:</div>
-                            <div>Vetor número {dot.lineIndex + 1}</div>
-                            <div>Posição do Ponto em relação ao vetor: {dot.positionPx}px</div>
-                            <div>
-                                <p>Digite o valor em metros: </p>
-                                <input 
-                                    type="number"
-                                    min="0"
-                                    value={dot.positionM}
-                                    onChange={(e) => handleDotInputChange(e, dot.id)}
-                                    placeholder='Metros'
-                                    className='dot-input'
-                                />
-                            </div>
-                        </div>
-                    ))}
-                </div>
+              <div>
+                {dots.length === 0 ? (
+                  <div>Nenhum ponto foi adicionado.</div>
+                ) : (
+                  dots.map((dot, i) => (
+                    <div key={i} className='dots-container'>
+                      <div>Ponto {dot.id}:</div>
+                      <div>Vetor número {dot.lineIndex + 1}</div>
+                      <div>Posição do Ponto em relação ao vetor: {dot.positionPx}px</div>
+                      <div>
+                        <p>Digite o valor em metros: </p>
+                        <input 
+                          type="number"
+                          min="0"
+                          value={dot.positionM}
+                          onChange={(e) => handleDotInputChange(e, dot.id)}
+                          placeholder='Metros'
+                          className='dot-input'
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
         </div>
-        <button onClick={saveCanvas}>Salvar Imagem</button>
+        <button onClick={handleSave}>Salvar Dados do Mapa</button>
     </div>
   );
 };
