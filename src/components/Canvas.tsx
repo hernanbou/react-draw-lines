@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import '../styles/canvas.css';
+import '../styles/canvas.scss';
 
 interface ImageDisplayProps {
   mapID: number;
@@ -74,7 +74,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         const line = lines[dot.lineIndex];
         if(line.start) {
           const dx = line.end!.x - line.start.x;
-          const dy = line. end!.y - line.start.y;
+          const dy = line.end!.y - line.start.y;
           const ratio = dot.positionPx / line.length;
           const pointX = line.start.x + dx * ratio;
           const pointY = line.start.y + dy * ratio;
@@ -399,9 +399,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             onClick={handleCanvasClick}
             onMouseMove={handleMouseMove}
         />
-        <div className="canvas-overlay">
-            <div ref={cursorRef} className="calibration-point" />
-        </div>
+        <div ref={cursorRef} className="calibration-point" />
         <div className="info-container">
             <div className="line-info">
                 <div>
@@ -409,7 +407,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
                     ? <div>Nenhuma lista de vetores disponível. Trace os vetores.</div>
                     : lines.map((line, i) =>(
                         <div key={i}>
-                            Linha {i + 1} : {line.length} px
+                            Linha {i + 1} : <span>{line.length} px</span>
                         </div>
                     ))}
                 </div>
@@ -422,9 +420,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
                   dots.map((dot, i) => (
                     <div key={i} className='dots-container'>
                       <div>Ponto {dot.id}:</div>
-                      <div>Vetor número {dot.lineIndex + 1}</div>
-                      <div>Posição do Ponto em relação ao vetor: {dot.positionPx}px</div>
-                      <div>
+                      <div>Vetor número <span>{dot.lineIndex + 1}</span></div>
+                      <div>Posição do Ponto em relação ao vetor: <span>{dot.positionPx} px</span></div>
+                      <div className='canvas-input'>
                         <p>Digite o valor em metros: </p>
                         <input 
                           type="number"

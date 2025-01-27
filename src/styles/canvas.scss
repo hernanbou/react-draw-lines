@@ -1,3 +1,5 @@
+@import './global.scss';
+
 .canvas-container {
     display: block;
     position: relative;
@@ -7,16 +9,8 @@
 .canvas-container canvas {
     position: relative;
     border: 1px solid black;
+    margin-top: 20px;
     cursor: url('../utils/target-cursor.svg') 24 24, auto;
-}
-
-.canvas-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
 }
 
 .calibration-point {
@@ -26,22 +20,26 @@
     background-color: #4b0082;
     position: absolute;
     pointer-events: none;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, 200%);
     display: none;
 }
 
 .info-container {
     display: flex;
     margin-top: 10px;
+    gap: 10px;
+    span{
+        color: $app-red;
+        font-weight: 600;
+    }
 }
 
 .line-info,
 .dots-info {
-    margin: 0 10px;
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid $app-lines;
     border-radius: 5px;
-    background-color: #f9f9f9;
+    background-color: $bg-color;
 }
 
 .line-info div,
@@ -52,20 +50,28 @@
 .dots-container {
     display: flex;
     align-items: center;
-    border: 1px solid #d1d1d1;
+    justify-items: center;
+    justify-content: start;
+    border: 1px solid $app-lines;
     padding: 0 10px;
     gap: 10px;
 }
 
 .dots-container div {
-    border: 1px solid #d1d1d1;
-    padding: 0 5px;
+    padding: 5px;
 }
-
+.canvas-input{
+    margin-left: auto;
+    display: flex;
+    gap: 10px;
+}
 .dot-input {
     width: 60px;
     padding: 2px;
     border: 1px solid #ccc;
+    font-family: $app-font;
+    font-weight: 600;
+    color: $app-red;
     border-radius: 3px;
     appearance: textfield;
 }
@@ -82,19 +88,19 @@
 
 .canvas-container button {
     position: relative;
-    left: 45%;
+    left: 25%;
+    font-family: $app-font;
+    font-size: 16px;
+    font-weight: bold;
     margin-top: 10px;
     padding: 10px 15px;
-    font-size: 16px;
-    color: #000;
-    background-color: #ccc;
+    color: $bg-color;
+    background-color: $app-text;
     border: none;
     border-radius: 5px;
     cursor: pointer;
-}
-
-.canvas-container button:hover {
-    background-color: #39FF14;
-    color: #000;
-    transition: 0.4s;
+    &:hover{
+        background-color: $app-green;
+        transition: 0.4s;
+    }
 }

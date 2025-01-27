@@ -1,0 +1,23 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+
+$bg-color: #2C2C2C;
+$app-green:#00DB75;
+$app-red: #DB1C00;
+$app-lines:#86382D;
+$app-text:#E9E8E4;
+$app-font: "Montserrat", serif;
+
+*{
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    ul {
+        list-style: none;
+    }
+}
+
+body{
+    font-family: $app-font;
+    background-color: $bg-color;
+    color: $app-text;
+}

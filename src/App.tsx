@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import MapSelector from "./pages/MapSelector";
 import Canvas from "./components/Canvas";
-
+import './styles/global.scss'
+import './styles/app.scss'
 
 interface Map {
   id: number;
@@ -24,16 +25,19 @@ const App: React.FC = () => {
   const selectedMap = maps.find((map) => map.id === selectedMapId);
 
   return (
-    <div>
+    <div className="container">
       <h1>Visualizador de Mapas</h1>
       <MapSelector maps={maps} onSelectMap={setSelectedMapId} />
       {selectedMap && (
         <div>
           <h2>{selectedMap.name}</h2>
           <h3>Proprietário: {selectedMap.owner}</h3>
-          <p>Aperte &#91; Z &#93; para alterar Zona</p>
-          <p>Aperte &#91; X &#93; para parar de desenhar</p>
-          <p>Aperte &#91; C &#93; para adicionar um Ponto de Calibração</p>
+          <menu>
+            <h4>Menu:</h4>
+            <p>Aperte &#91; Z &#93; para alterar Zona</p>
+            <p>Aperte &#91; X &#93; para parar de desenhar</p>
+            <p>Aperte &#91; C &#93; para adicionar um Ponto de Calibração</p>
+          </menu>
           <Canvas mapID={selectedMap.id} />
         </div>
       )}
