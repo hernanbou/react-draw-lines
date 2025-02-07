@@ -22,7 +22,9 @@ interface Dot{
   id: number;
   lineIndex: number;
   positionPx: number;
-  positionM:number;
+  positionM?:number;
+  zoneID?:number;
+  zoneDistance?: number;
 }
 
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
@@ -36,7 +38,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [triggerRedraw, setTriggerRedraw] = useState<boolean>(false);
-
+  const [zoneState, setZoneState] = useState<boolean>(false);
+  const [zoneLength, setZoneLength] = useState<Dot[]>([]);
+  
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -72,7 +76,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   
       dots.forEach(dot => {
         const line = lines[dot.lineIndex];
-        if(line.start) {
+        if (line.start) {
           const dx = line.end!.x - line.start.x;
           const dy = line.end!.y - line.start.y;
           const ratio = dot.positionPx / line.length;
@@ -81,6 +85,21 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
           ctx.beginPath();
           ctx.arc(pointX, pointY, 4, 0, Math.PI * 2); // valor do raio do ponto
           ctx.fillStyle = '#4B0082';
+          ctx.fill();
+        }
+      });
+  
+      zoneLength.forEach(zoneDot => {
+        const line = lines[zoneDot.lineIndex];
+        if (line.start) {
+          const dx = line.end!.x - line.start.x;
+          const dy = line.end!.y - line.start.y;
+          const ratio = zoneDot.positionPx / line.length;
+          const pointX = line.start.x + dx * ratio;
+          const pointY = line.start.y + dy * ratio;
+          ctx.beginPath();
+          ctx.arc(pointX, pointY, 4, 0, Math.PI * 2); // valor do raio do ponto
+          ctx.fillStyle = '#39FF14';
           ctx.fill();
         }
       });
@@ -99,8 +118,8 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         ctx.fill();
       }
     };
-  };  
-
+  };
+  
   const isMouseOverLine = (x: number, y: number, line: Line): boolean => {
     const distance = Math.sqrt(Math.pow(line.end!.x - line.start!.x, 2) + Math.pow(line.end!.y - line.start!.y, 2));
     const distanceToStart = Math.sqrt(Math.pow(x - line.start!.x, 2) + Math.pow(y - line.start!.y, 2));
@@ -122,22 +141,83 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     } else {
       setCurrentStart({ x, y });
     }
+  }; 
+  
+  const calculateZoneDistance = (point1: Dot, point2: Dot): number => {
+    let zoneDistance = 0;
+  
+    if (point1.lineIndex === point2.lineIndex) {
+      return Math.abs(point2.positionPx - point1.positionPx);
+    }
+   
+    zoneDistance += lines[point1.lineIndex].length - point1.positionPx;  // distancia do primeiro ponto ate o final do vetor em que ele foi posicionado
+    
+    zoneDistance += point2.positionPx; // distancia do inicio do vetor em que o segundo ponto esta ate o ponto
+    
+    for (let i = point1.lineIndex + 1; i < point2.lineIndex; i++) { 
+      zoneDistance += lines[i].length;
+    } // distancia dos vetores intermediários
+  
+    return parseFloat(zoneDistance.toFixed(5));
   };  
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
+  
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
-    finalizeLine(x, y);
+  
+    if (zoneState) {
+      const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(x, y, line));
+  
+      if (lineUnderCursorIndex !== -1) {
+        const line = lines[lineUnderCursorIndex];
+        if (line.start && line.end) {
+          const lengthToStart = Math.sqrt(Math.pow(x - line.start.x, 2) + Math.pow(y - line.start.y, 2)).toFixed(5);
+          const newDot: Dot = {
+            id: zoneLength.length + 1,
+            lineIndex: lineUnderCursorIndex,
+            positionPx: parseFloat(lengthToStart),
+            zoneID: Math.ceil((zoneLength.length + 1) / 2), // Incrementa o zoneID a cada número ímpar de pontos
+          };
+  
+          setZoneLength((prevZoneLength) => {
+            const updatedZoneLength = [...prevZoneLength, newDot];
+            if (updatedZoneLength.length % 2 === 0) {
+              const lastDot = updatedZoneLength[updatedZoneLength.length - 1];
+              const secondLastDot = updatedZoneLength[updatedZoneLength.length - 2];
+              const totalDistance = calculateZoneDistance(secondLastDot, lastDot);
+              updatedZoneLength[updatedZoneLength.length - 1].zoneDistance = totalDistance;
+              updatedZoneLength[updatedZoneLength.length - 2].zoneDistance = totalDistance;
+            }
+            return updatedZoneLength;
+          });
+  
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const dx = line.end.x - line.start.x;
+            const dy = line.end.y - line.start.y;
+            const ratio = parseFloat(lengthToStart) / line.length;
+            const pointX = line.start.x + dx * ratio;
+            const pointY = line.start.y + dy * ratio;
+            ctx.beginPath();
+            ctx.arc(pointX, pointY, 4, 0, Math.PI * 2); // valor do raio do ponto
+            ctx.fillStyle = '#39FF14';
+            ctx.fill();
+          }
+        }
+      }
+      console.log(zoneLength)
+    } else {
+      finalizeLine(x, y);
+    }
   };
-
+  
   const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'z') {
-      setCurrentColor((prevColor) => (prevColor === '#D80300' ? '#39FF14' : '#D80300'));
+      setZoneState((prev) => !prev);
     } else if (e.key === 'x') {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
@@ -157,53 +237,46 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         const line = lines[lineUnderCursorIndex];
         const lengthToStart = Math.sqrt(Math.pow(mousePos.x - line.start!.x, 2) + Math.pow(mousePos.y - line.start!.y, 2)).toFixed(5);
         const newDot: Dot = {
-          id:dots.length + 1,
+          id: dots.length + 1,
           lineIndex: lineUnderCursorIndex,
           positionPx: parseFloat(lengthToStart),
-          positionM:0,
+          positionM: 0,
         };
         setDots((prevDots) => [...prevDots, newDot]);
         setTriggerRedraw(true);
       }
-      console.log(dots)
     }
-  };
+  };    
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>): void => {
     const canvas = canvasRef.current;
     const cursor = cursorRef.current;
     if (!canvas || !cursor) return;
-
+  
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
+  
     setMousePos({ x, y });
-
-    if (currentStart) {
-        drawTemporaryLine(x, y);
-        cursor.style.display = 'block';
-        cursor.style.left = `${x}px`;
-        cursor.style.top = `${y}px`;
-
-        const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
-        if (isOverLine) {
-            cursor.style.backgroundColor = '#4B0082';
-        } else {
-            cursor.style.display = 'none';
-        }
+  
+    const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
+    if (isOverLine && !isDrawing) {
+      cursor.style.display = 'block';
+      cursor.style.left = `${x}px`;
+      cursor.style.top = `${y}px`;
+      cursor.style.backgroundColor = zoneState ? '#39FF14' : '#4B0082';
     } else {
-        const isOverLine = lines.some(line => line.start && line.end && isMouseOverLine(x, y, line));
-        if (isOverLine && !isDrawing) {
-            cursor.style.display = 'block';
-            cursor.style.left = `${x}px`;
-            cursor.style.top = `${y}px`;
-            cursor.style.backgroundColor = '#4B0082';
-        } else {
-            cursor.style.display = 'none';
-        }
+      cursor.style.display = 'none';
     }
-  };
+  
+    if (currentStart) {
+      drawTemporaryLine(x, y);
+      cursor.style.display = 'block';
+      cursor.style.left = `${x}px`;
+      cursor.style.top = `${y}px`;
+      cursor.style.backgroundColor = zoneState ? '#39FF14' : '#4B0082';
+    }
+  };  
 
   const handleDotInputChange = (e:React.ChangeEvent<HTMLInputElement>, dotID: number) => {
     const newPositionM = parseFloat(e.target.value);
