@@ -12,10 +12,11 @@ interface MapData {
 }
 
 interface Line {
-  start?: {x: number; y:number};
-  end?: {x: number; y:number};
+  start: {x: number; y:number};
+  end: {x: number; y:number};
   length: number;
-  color?: string;
+  color: string;
+  index: number;
 }
 
 interface Dot{
@@ -24,6 +25,7 @@ interface Dot{
   positionPx: number;
   positionM?:number;
   zoneID?:number;
+  color:string;
   zoneDistance?: number;
 }
 
@@ -135,13 +137,22 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const finalizeLine = (x: number, y: number) => {
     if (currentStart) {
       const length = calculateLineLength(currentStart, { x, y });
-      setLines([...lines, { start: currentStart, end: { x, y }, length: parseFloat(length), color: currentColor }]);
+      const newIndex = lines.length + 1;
+      const newLine: Line = {
+        start: currentStart,
+        end: { x, y },
+        length: parseFloat(length),
+        color: currentColor,
+        index: newIndex
+      };
+      setLines((prevLines) => [...prevLines, newLine]);
       setCurrentStart({ x, y });
       setIsDrawing(true);
     } else {
       setCurrentStart({ x, y });
     }
-  }; 
+};
+
   
   const calculateZoneDistance = (point1: Dot, point2: Dot): number => {
     let zoneDistance = 0;
@@ -180,6 +191,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             id: zoneLength.length + 1,
             lineIndex: lineUnderCursorIndex,
             positionPx: parseFloat(lengthToStart),
+            color:'#39FF14',
             zoneID: Math.ceil((zoneLength.length + 1) / 2), // Incrementa o zoneID a cada número ímpar de pontos
           };
   
@@ -209,7 +221,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
           }
         }
       }
-      console.log(zoneLength)
     } else {
       finalizeLine(x, y);
     }
@@ -240,6 +251,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
           id: dots.length + 1,
           lineIndex: lineUnderCursorIndex,
           positionPx: parseFloat(lengthToStart),
+          color:'#4B0082',
           positionM: 0,
         };
         setDots((prevDots) => [...prevDots, newDot]);
@@ -297,6 +309,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     }
   };
 
+  /*
   const saveImage = async (canvas: HTMLCanvasElement | null) => {
     if (!canvas) return;
   
@@ -321,10 +334,10 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         console.error('Erro ao salvar imagem:', error);
       }
     }, 'image/png');
-  };  
+  };
+  */ 
 
   const saveLines = async () => {
-    const lineLengths = lines.map(line => line.length);
   
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
@@ -332,7 +345,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ line_list: lineLengths }),
+        body: JSON.stringify({ line_list: lines }),
       });
   
       if (response.ok) {
@@ -364,13 +377,35 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       console.error('Erro ao salvar pontos:', error);
     }
   };
+
+  const saveZones = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ zone_list: zoneLength }),
+      });
+  
+      if (response.ok) {
+        console.log('Zonas salvos com sucesso!');
+      } else {
+        console.error('Erro ao salvar zonas:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar zonas:', error);
+    }
+  };
   
   const handleSave = () => {
-    const canvas = canvasRef.current;
 
-    saveImage(canvas);
+    //const canvas = canvasRef.current;
+    //saveImage(canvas);
+
     saveLines();
     saveDots();
+    saveZones();
   };
 
   const fetchMapData = useCallback(async () => {
@@ -391,12 +426,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const fetchLineList = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}/line_list`);
-      const lineData: number[] = await response.json();
+      const lineData: Line[] = await response.json();
 
-      const newLines = lineData.map((length) => ({
-        length,
-      }));
-      setLines(newLines);
+      setLines(lineData);
     } catch (error) {
       console.error('Erro ao buscar lista de vetores', error);
     }
