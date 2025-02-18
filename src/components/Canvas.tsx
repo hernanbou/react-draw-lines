@@ -5,12 +5,6 @@ interface ImageDisplayProps {
   mapID: number;
 }
 
-interface MapData {
-  id: number;
-  zone_image:string;
-  original_image: string;
-}
-
 interface Line {
   start: {x: number; y:number};
   end: {x: number; y:number};
@@ -191,18 +185,20 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             id: zoneLength.length + 1,
             lineIndex: lineUnderCursorIndex,
             positionPx: parseFloat(lengthToStart),
-            color:'#39FF14',
-            zoneID: Math.ceil((zoneLength.length + 1) / 2), // Incrementa o zoneID a cada número ímpar de pontos
+            color: '#39FF14',
+            zoneID: zoneLength.length + 1, // Atualiza o zoneID de forma contínua
           };
   
           setZoneLength((prevZoneLength) => {
             const updatedZoneLength = [...prevZoneLength, newDot];
-            if (updatedZoneLength.length % 2 === 0) {
+            if (updatedZoneLength.length === 1) {
+              // Se for o primeiro ponto, zoneDistance é igual a positionPx
+              updatedZoneLength[0].zoneDistance = newDot.positionPx;
+            } else if (updatedZoneLength.length > 1) {
               const lastDot = updatedZoneLength[updatedZoneLength.length - 1];
               const secondLastDot = updatedZoneLength[updatedZoneLength.length - 2];
               const totalDistance = calculateZoneDistance(secondLastDot, lastDot);
               updatedZoneLength[updatedZoneLength.length - 1].zoneDistance = totalDistance;
-              updatedZoneLength[updatedZoneLength.length - 2].zoneDistance = totalDistance;
             }
             return updatedZoneLength;
           });
@@ -225,7 +221,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       finalizeLine(x, y);
     }
   };
-  
+   
   const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'z') {
       setZoneState((prev) => !prev);
@@ -309,34 +305,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     }
   };
 
-  /*
-  const saveImage = async (canvas: HTMLCanvasElement | null) => {
-    if (!canvas) return;
-  
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-  
-      const formData = new FormData();
-      formData.append('image', blob);
-  
-      try {
-        const response = await fetch(`http://localhost:5000/maps/${mapID}/save_image`, {
-          method: 'PUT',
-          body: formData,
-        });
-  
-        if (response.ok) {
-          console.log('Imagem salva com sucesso!');
-        } else {
-          console.error('Erro ao salvar imagem:', response.statusText);
-        }
-      } catch (error) {
-        console.error('Erro ao salvar imagem:', error);
-      }
-    }, 'image/png');
-  };
-  */ 
-
   const saveLines = async () => {
   
     try {
@@ -410,18 +378,19 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
   const fetchMapData = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:5000/maps/${mapID}`);
-      const mapData: MapData = await response.json();
-
-      const url = mapData.zone_image
-        ? `http://localhost:5000/maps/${mapID}/zone_image`
-        : `http://localhost:5000/maps/${mapID}/original_image`;
-
-      setImageUrl(url);
+      console.log('Fetching map data...');
+      const response = await fetch(`http://localhost:5000/maps/${mapID}/original_image`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const imageUrl = URL.createObjectURL(blob);
+      console.log('Map image fetched:', imageUrl);
+      setImageUrl(imageUrl);
     } catch (error) {
       console.error('Erro ao buscar dados do mapa', error);
     }
-  }, [mapID]);
+  }, [mapID, setImageUrl]);  
 
   const fetchLineList = useCallback(async () => {
     try {
@@ -443,7 +412,18 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     } catch (error) {
       console.error('Erro ao buscar lista de pontos', error);
     }
-  }, [mapID, setDots]);  
+  }, [mapID, setDots]);
+  
+  const fetchZoneList = useCallback(async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/maps/${mapID}/zone_list`);
+      const zoneData: Dot[] = await response.json();
+      
+      setZoneLength(zoneData);
+    } catch (error) {
+      console.error('Erro ao buscar lista de pontos', error);
+    }
+  }, [mapID, setZoneLength]); 
 
   const resetStates = () => {
     setLines([]);
@@ -463,8 +443,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     fetchMapData();
     fetchLineList();
     fetchPointList();
+    fetchZoneList();
     resetStates();
-  }, [fetchMapData, fetchLineList, fetchPointList]);    
+  }, [fetchMapData, fetchLineList, fetchPointList, fetchZoneList]);    
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
