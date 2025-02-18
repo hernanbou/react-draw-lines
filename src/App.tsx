@@ -34,7 +34,7 @@ const App: React.FC = () => {
           <h3>Proprietário: {selectedMap.owner}</h3>
           <menu>
             <h4>Menu:</h4>
-            <p>Aperte &#91; Z &#93; para alterar Zona</p>
+            <p>Aperte &#91; Z &#93; para alterar entre criar Zonas e Traçar Perimetro</p>
             <p>Aperte &#91; X &#93; para parar de desenhar</p>
             <p>Aperte &#91; C &#93; para adicionar um Ponto de Calibração</p>
           </menu>
