@@ -13,7 +13,6 @@ maps = [
         'owner': 'Chitãozinho e Xoxoró',
         'name': 'Rancho Fundo',
         'original_image': 'img/farm_1.png',
-        'zone_image': '',
         'line_list': [],
         'point_list': [],
         'zone_list' : []
@@ -23,7 +22,6 @@ maps = [
         'owner': 'Menino da Porteira',
         'name': 'Sérgio Reis',
         'original_image': 'img/farm_2.png',
-        'zone_image': '',
         'line_list': [],
         'point_list': [],
         'zone_list' : []
@@ -33,7 +31,6 @@ maps = [
         'owner': 'Seu Lobato',
         'name': 'Sítio do Seu Lobato',
         'original_image': 'img/farm_3.png',
-        'zone_image': '',
         'line_list': [],
         'point_list': [],
         'zone_list' : []
@@ -43,7 +40,6 @@ maps = [
         'owner': 'Thiago Violeiro e Thalysson',
         'name': 'Ranchinho',
         'original_image': 'img/farm_4.png',
-        'zone_image': '',
         'line_list': [],
         'point_list': [],
         'zone_list' : []
@@ -91,10 +87,6 @@ def get_image(map_id, image_key, folder):
 def get_map_img(id):
     return get_image(id, 'original_image', 'img')
 
-@app.route('/maps/<int:id>/zone_image', methods=['GET'])
-def get_zone_img(id):
-    return get_image(id, 'zone_image', 'img-zone')
-
 # Exibir lista de linhas
 @app.route('/maps/<int:id>/line_list', methods=['GET'])
 def get_map_line_list(id):
@@ -121,7 +113,6 @@ def post_new_map():
         return jsonify({'erro': 'Dados inválidos'}), 400
     new_map.update({
         'id': max((map['id'] for map in maps), default=0) + 1,
-        'zone_image': '',
         'line_list': [],
         'point_list': [],
         'zone_list' : []
@@ -147,27 +138,6 @@ def delete_map(id):
     if map:
         maps.remove(map)
         return jsonify(maps)
-    return jsonify({'erro': 'Mapa não encontrado'}), 404
-
-# Salvar imagem alterada
-@app.route('/maps/<int:id>/save_image', methods=['PUT'])
-def save_image_blob(id):
-    if 'image' not in request.files:
-        return jsonify({'erro': 'Nenhuma imagem enviada'}), 400
-
-    image_file = request.files['image']
-
-    if image_file:
-        filename = secure_filename(f'zone_img_ID-{id}.png')
-        image_path = os.path.join('img-zone', filename).replace("\\", "/")
-        image_file.save(image_path)
-
-        map = next((m for m in maps if m['id'] == id), None)
-        if map:
-            map.update({
-                'zone_image': image_path,
-            })
-            return jsonify({'message': 'Imagem salva com sucesso!'})
     return jsonify({'erro': 'Mapa não encontrado'}), 404
 
 if __name__ == "__main__":
