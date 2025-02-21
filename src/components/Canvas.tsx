@@ -88,17 +88,29 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       zoneLength.forEach(zoneDot => {
         const line = lines[zoneDot.lineIndex];
         if (line.start) {
-          const dx = line.end!.x - line.start.x;
-          const dy = line.end!.y - line.start.y;
+          const dx = line.end.x - line.start.x;
+          const dy = line.end.y - line.start.y;
           const ratio = zoneDot.positionPx / line.length;
           const pointX = line.start.x + dx * ratio;
           const pointY = line.start.y + dy * ratio;
+   
+          const perpendicularAngle = Math.atan2(dy, dx) + Math.PI / 2; // calcular a inclinação perpendicular
+          const perpLength  = 6; // comprimento do traço
+      
+          // coordenadas do traço perpendicular
+          const startX = pointX + perpLength  * Math.cos(perpendicularAngle);
+          const startY = pointY + perpLength  * Math.sin(perpendicularAngle);
+          const endX = pointX - perpLength  * Math.cos(perpendicularAngle);
+          const endY = pointY - perpLength  * Math.sin(perpendicularAngle);
+      
           ctx.beginPath();
-          ctx.arc(pointX, pointY, 4, 0, Math.PI * 2); // valor do raio do ponto
-          ctx.fillStyle = '#39FF14';
-          ctx.fill();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
+          ctx.lineWidth = 4; // espessura do traço
+          ctx.strokeStyle = '#FDEE2F';
+          ctx.stroke();
         }
-      });
+      });      
   
       if (tempLine) {
         ctx.beginPath();
@@ -185,14 +197,14 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             id: zoneLength.length + 1,
             lineIndex: lineUnderCursorIndex,
             positionPx: parseFloat(lengthToStart),
-            color: '#39FF14',
+            color: '#FDEE2F',
             zoneID: zoneLength.length + 1, // Atualiza o zoneID de forma contínua
           };
   
           setZoneLength((prevZoneLength) => {
             const updatedZoneLength = [...prevZoneLength, newDot];
             if (updatedZoneLength.length === 1) {
-              // Se for o primeiro ponto, zoneDistance é igual a positionPx
+              // se for o primeiro ponto, zoneDistance é igual a positionPx
               updatedZoneLength[0].zoneDistance = newDot.positionPx;
             } else if (updatedZoneLength.length > 1) {
               const lastDot = updatedZoneLength[updatedZoneLength.length - 1];
@@ -210,10 +222,22 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             const ratio = parseFloat(lengthToStart) / line.length;
             const pointX = line.start.x + dx * ratio;
             const pointY = line.start.y + dy * ratio;
+
+            const perpendicularAngle = Math.atan2(dy, dx) + Math.PI / 2; // calcular a inclinação perpendicular
+            const perpLength  = 6; // comprimento do traço
+
+            // coordenadas do traço perpendicular
+            const startX = pointX + perpLength  * Math.cos(perpendicularAngle);
+            const startY = pointY + perpLength  * Math.sin(perpendicularAngle);
+            const endX = pointX - perpLength  * Math.cos(perpendicularAngle);
+            const endY = pointY - perpLength  * Math.sin(perpendicularAngle);
+
             ctx.beginPath();
-            ctx.arc(pointX, pointY, 4, 0, Math.PI * 2); // valor do raio do ponto
-            ctx.fillStyle = '#39FF14';
-            ctx.fill();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.lineWidth = 4; // espessura do traço
+            ctx.strokeStyle = '#FDEE2F';
+            ctx.stroke();
           }
         }
       }
@@ -272,7 +296,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       cursor.style.display = 'block';
       cursor.style.left = `${x}px`;
       cursor.style.top = `${y}px`;
-      cursor.style.backgroundColor = zoneState ? '#39FF14' : '#4B0082';
+      cursor.style.backgroundColor = zoneState ? '#FDEE2F' : '#4B0082';
     } else {
       cursor.style.display = 'none';
     }
@@ -282,7 +306,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       cursor.style.display = 'block';
       cursor.style.left = `${x}px`;
       cursor.style.top = `${y}px`;
-      cursor.style.backgroundColor = zoneState ? '#39FF14' : '#4B0082';
+      cursor.style.backgroundColor = zoneState ? '#FDEE2F' : '#4B0082';
     }
   };  
 
