@@ -1,27 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import '../styles/canvas.scss';
 
-interface ImageDisplayProps {
-  mapID: number;
-}
-
-interface Line {
-  start: {x: number; y:number};
-  end: {x: number; y:number};
-  length: number;
-  color: string;
-  index: number;
-}
-
-interface Dot{
-  id: number;
-  lineIndex: number;
-  positionPx: number;
-  positionM?:number;
-  zoneID?:number;
-  color:string;
-  zoneDistance?: number;
-}
+import {drawPerpendicularLine} from '../utils/drawPerpendicularLine';
+import {isMouseOverLine} from '../utils/isMouseOverLine'
+import {Dot, Line, ImageDisplayProps} from '../utils/types'
+import {saveLines, saveDots, saveZones} from '../utils/savesUtils'
 
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -41,100 +24,83 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
-  
+
     const image = new Image();
     image.src = imageUrl;
     image.crossOrigin = 'anonymous';
-  
+
     image.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // limpa o canvas
-      ctx.drawImage(image, 0, 0); // redesenha a imagem
-  
-      lines.forEach((line) => {
-        if (line.start && line.end) {
-          ctx.beginPath();
-          ctx.moveTo(line.start.x, line.start.y);
-          ctx.lineTo(line.end.x, line.end.y);
-          ctx.strokeStyle = line.color || '#D80300';
-          ctx.lineWidth = 3; // valor da largura do vetor
-          ctx.stroke();
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpa o canvas
+        ctx.drawImage(image, 0, 0); // Redesenha a imagem
+
+        // desenha todos os vetores
+        lines.forEach(({ start, end, color = '#D80300' }) => {
+            if (start && end) {
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+        });
+
+        // desenha os pontos finais dos vetores
+        lines.forEach(({ end }) => {
+            if (end) {
+                ctx.beginPath();
+                ctx.arc(end.x, end.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#FDEE2F';
+                ctx.fill();
+            }
+        });
+
+        // desenha os pontos de calibracao
+        dots.forEach(({ lineIndex, positionPx }) => {
+            const line = lines[lineIndex];
+            if (line.start && line.end) {
+                const { x: startX, y: startY } = line.start;
+                const { x: endX, y: endY } = line.end;
+                const ratio = positionPx / line.length;
+                const pointX = startX + (endX - startX) * ratio;
+                const pointY = startY + (endY - startY) * ratio;
+                
+                ctx.beginPath();
+                ctx.arc(pointX, pointY, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#4B0082';
+                ctx.fill();
+            }
+        });
+
+        // desenha as traves perpendiculares
+        zoneLength.forEach(({ lineIndex, positionPx }) => {
+            const line = lines[lineIndex];
+            if (line.start && line.end) {
+                const { x: startX, y: startY } = line.start;
+                const { x: endX, y: endY } = line.end;
+                const ratio = positionPx / line.length;
+                const pointX = startX + (endX - startX) * ratio;
+                const pointY = startY + (endY - startY) * ratio;
+                drawPerpendicularLine(ctx, line, pointX, pointY);
+            }
+        });
+
+        // desenha a linha temporária
+        if (tempLine) {
+            ctx.beginPath();
+            ctx.moveTo(tempLine.start.x, tempLine.start.y);
+            ctx.lineTo(tempLine.end.x, tempLine.end.y);
+            ctx.strokeStyle = tempLine.color;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(tempLine.start.x, tempLine.start.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#FDEE2F';
+            ctx.fill();
         }
-      });
-  
-      lines.forEach((line) => {
-        if (line.end) {
-          ctx.beginPath();
-          ctx.arc(line.end.x, line.end.y, 4, 0, Math.PI * 2); // valor do raio do ponto
-          ctx.fillStyle = '#FDEE2F';
-          ctx.fill();
-        }
-      });
-  
-      dots.forEach(dot => {
-        const line = lines[dot.lineIndex];
-        if (line.start) {
-          const dx = line.end!.x - line.start.x;
-          const dy = line.end!.y - line.start.y;
-          const ratio = dot.positionPx / line.length;
-          const pointX = line.start.x + dx * ratio;
-          const pointY = line.start.y + dy * ratio;
-          ctx.beginPath();
-          ctx.arc(pointX, pointY, 4, 0, Math.PI * 2); // valor do raio do ponto
-          ctx.fillStyle = '#4B0082';
-          ctx.fill();
-        }
-      });
-  
-      zoneLength.forEach(zoneDot => {
-        const line = lines[zoneDot.lineIndex];
-        if (line.start) {
-          const dx = line.end.x - line.start.x;
-          const dy = line.end.y - line.start.y;
-          const ratio = zoneDot.positionPx / line.length;
-          const pointX = line.start.x + dx * ratio;
-          const pointY = line.start.y + dy * ratio;
-   
-          const perpendicularAngle = Math.atan2(dy, dx) + Math.PI / 2; // calcular a inclinação perpendicular
-          const perpLength  = 6; // comprimento do traço
-      
-          // coordenadas do traço perpendicular
-          const startX = pointX + perpLength  * Math.cos(perpendicularAngle);
-          const startY = pointY + perpLength  * Math.sin(perpendicularAngle);
-          const endX = pointX - perpLength  * Math.cos(perpendicularAngle);
-          const endY = pointY - perpLength  * Math.sin(perpendicularAngle);
-      
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.lineTo(endX, endY);
-          ctx.lineWidth = 4; // espessura do traço
-          ctx.strokeStyle = '#FDEE2F';
-          ctx.stroke();
-        }
-      });      
-  
-      if (tempLine) {
-        ctx.beginPath();
-        ctx.moveTo(tempLine.start.x, tempLine.start.y);
-        ctx.lineTo(tempLine.end.x, tempLine.end.y);
-        ctx.strokeStyle = tempLine.color;
-        ctx.lineWidth = 3; // valor da largura do vetor
-        ctx.stroke();
-  
-        ctx.beginPath();
-        ctx.arc(tempLine.start.x, tempLine.start.y, 4, 0, Math.PI * 2); // valor do raio do ponto
-        ctx.fillStyle = '#FDEE2F';
-        ctx.fill();
-      }
     };
   };
-  
-  const isMouseOverLine = (x: number, y: number, line: Line): boolean => {
-    const distance = Math.sqrt(Math.pow(line.end!.x - line.start!.x, 2) + Math.pow(line.end!.y - line.start!.y, 2));
-    const distanceToStart = Math.sqrt(Math.pow(x - line.start!.x, 2) + Math.pow(y - line.start!.y, 2));
-    const distanceToEnd = Math.sqrt(Math.pow(x - line.end!.x, 2) + Math.pow(y - line.end!.y, 2));
-    
-    return Math.abs(distance - (distanceToStart + distanceToEnd)) < 0.01; //precisão de proximidade do mouse em relação ao vetor
-  };  
 
   const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
     return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
@@ -181,68 +147,52 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-  
+
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-  
+
     if (zoneState) {
-      const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(x, y, line));
-  
-      if (lineUnderCursorIndex !== -1) {
-        const line = lines[lineUnderCursorIndex];
-        if (line.start && line.end) {
-          const lengthToStart = Math.sqrt(Math.pow(x - line.start.x, 2) + Math.pow(y - line.start.y, 2)).toFixed(5);
-          const newDot: Dot = {
-            id: zoneLength.length + 1,
-            lineIndex: lineUnderCursorIndex,
-            positionPx: parseFloat(lengthToStart),
-            color: '#FDEE2F',
-            zoneID: zoneLength.length + 1, // Atualiza o zoneID de forma contínua
-          };
-  
-          setZoneLength((prevZoneLength) => {
-            const updatedZoneLength = [...prevZoneLength, newDot];
-            if (updatedZoneLength.length === 1) {
-              // se for o primeiro ponto, zoneDistance é igual a positionPx
-              updatedZoneLength[0].zoneDistance = newDot.positionPx;
-            } else if (updatedZoneLength.length > 1) {
-              const lastDot = updatedZoneLength[updatedZoneLength.length - 1];
-              const secondLastDot = updatedZoneLength[updatedZoneLength.length - 2];
-              const totalDistance = calculateZoneDistance(secondLastDot, lastDot);
-              updatedZoneLength[updatedZoneLength.length - 1].zoneDistance = totalDistance;
+        const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(x, y, line));
+
+        if (lineUnderCursorIndex !== -1) {
+            const line = lines[lineUnderCursorIndex];
+            if (line.start && line.end) {
+                const lengthToStart = Math.sqrt(Math.pow(x - line.start.x, 2) + Math.pow(y - line.start.y, 2)).toFixed(5);
+                const newDot: Dot = {
+                    id: zoneLength.length + 1,
+                    lineIndex: lineUnderCursorIndex,
+                    positionPx: parseFloat(lengthToStart),
+                    color: '#FDEE2F',
+                    zoneID: zoneLength.length + 1,
+                };
+
+                setZoneLength((prevZoneLength) => {
+                    const updatedZoneLength = [...prevZoneLength, newDot];
+                    if (updatedZoneLength.length === 1) {
+                        updatedZoneLength[0].zoneDistance = newDot.positionPx;
+                    } else if (updatedZoneLength.length > 1) {
+                        const lastDot = updatedZoneLength[updatedZoneLength.length - 1];
+                        const secondLastDot = updatedZoneLength[updatedZoneLength.length - 2];
+                        const totalDistance = calculateZoneDistance(secondLastDot, lastDot);
+                        updatedZoneLength[updatedZoneLength.length - 1].zoneDistance = totalDistance;
+                    }
+                    return updatedZoneLength;
+                });
+
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    const dx = line.end.x - line.start.x;
+                    const dy = line.end.y - line.start.y;
+                    const ratio = parseFloat(lengthToStart) / line.length;
+                    const pointX = line.start.x + dx * ratio;
+                    const pointY = line.start.y + dy * ratio;
+                    drawPerpendicularLine(ctx, line, pointX, pointY);
+                }
             }
-            return updatedZoneLength;
-          });
-  
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            const dx = line.end.x - line.start.x;
-            const dy = line.end.y - line.start.y;
-            const ratio = parseFloat(lengthToStart) / line.length;
-            const pointX = line.start.x + dx * ratio;
-            const pointY = line.start.y + dy * ratio;
-
-            const perpendicularAngle = Math.atan2(dy, dx) + Math.PI / 2; // calcular a inclinação perpendicular
-            const perpLength  = 6; // comprimento do traço
-
-            // coordenadas do traço perpendicular
-            const startX = pointX + perpLength  * Math.cos(perpendicularAngle);
-            const startY = pointY + perpLength  * Math.sin(perpendicularAngle);
-            const endX = pointX - perpLength  * Math.cos(perpendicularAngle);
-            const endY = pointY - perpLength  * Math.sin(perpendicularAngle);
-
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
-            ctx.lineWidth = 4; // espessura do traço
-            ctx.strokeStyle = '#FDEE2F';
-            ctx.stroke();
-          }
         }
-      }
     } else {
-      finalizeLine(x, y);
+        finalizeLine(x, y);
     }
   };
    
@@ -328,76 +278,11 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       });
     }
   };
-
-  const saveLines = async () => {
-  
-    try {
-      const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ line_list: lines }),
-      });
-  
-      if (response.ok) {
-        console.log('Vetores salvas com sucesso!');
-      } else {
-        console.error('Erro ao salvar vetores:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Erro ao salvar vetores:', error);
-    }
-  };   
-
-  const saveDots = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ point_list: dots }),
-      });
-  
-      if (response.ok) {
-        console.log('Pontos salvos com sucesso!');
-      } else {
-        console.error('Erro ao salvar pontos:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Erro ao salvar pontos:', error);
-    }
-  };
-
-  const saveZones = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ zone_list: zoneLength }),
-      });
-  
-      if (response.ok) {
-        console.log('Zonas salvos com sucesso!');
-      } else {
-        console.error('Erro ao salvar zonas:', response.statusText);
-      }
-    } catch (error) {
-      console.error('Erro ao salvar zonas:', error);
-    }
-  };
   
   const handleSave = () => {
-
-    //const canvas = canvasRef.current;
-    //saveImage(canvas);
-
-    saveLines();
-    saveDots();
-    saveZones();
+    saveLines(mapID, lines);
+    saveDots(mapID, dots);
+    saveZones(mapID, zoneLength);
   };
 
   const fetchMapData = useCallback(async () => {
