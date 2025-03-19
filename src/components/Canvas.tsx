@@ -19,6 +19,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [triggerRedraw, setTriggerRedraw] = useState<boolean>(false);
   const [zoneState, setZoneState] = useState<boolean>(false);
   const [zoneLength, setZoneLength] = useState<Dot[]>([]);
+  const [scaleFactor,setScaleFactor] = useState<number>(0);
   
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
@@ -144,6 +145,20 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     return parseFloat(zoneDistance.toFixed(5));
   };  
 
+  const calculateScale = (distanceMeters: number, distancePixels: number): number =>{
+    if(distancePixels > 0){
+      setScaleFactor(distanceMeters / distancePixels);
+    }
+    return 0
+  };
+
+  const convertPixelsToMeters = (distancePixels: number): number => {
+    if(scaleFactor !== null){
+      return distancePixels * scaleFactor;
+    }
+    return 0
+  };
+
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -159,10 +174,13 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             const line = lines[lineUnderCursorIndex];
             if (line.start && line.end) {
                 const lengthToStart = Math.sqrt(Math.pow(x - line.start.x, 2) + Math.pow(y - line.start.y, 2)).toFixed(5);
+                const calculatePositonMeters = convertPixelsToMeters(parseFloat(lengthToStart));
+                console.log(calculatePositonMeters)
                 const newDot: Dot = {
                     id: zoneLength.length + 1,
                     lineIndex: lineUnderCursorIndex,
                     positionPx: parseFloat(lengthToStart),
+                    positionM: calculatePositonMeters,
                     color: '#FDEE2F',
                     zoneID: zoneLength.length + 1,
                 };
@@ -216,11 +234,22 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       
       if (lineUnderCursorIndex !== -1){
         const line = lines[lineUnderCursorIndex];
-        const lengthToStart = Math.sqrt(Math.pow(mousePos.x - line.start!.x, 2) + Math.pow(mousePos.y - line.start!.y, 2)).toFixed(5);
+        const lengthToStart = Math.sqrt(Math.pow(mousePos.x - line.start!.x, 2) + Math.pow(mousePos.y - line.start!.y, 2));
+        const totalPreviousLength = lines
+          .slice(0, lineUnderCursorIndex) // Linhas anteriores
+          .reduce((sum, prevLine) => {
+            if (prevLine.start && prevLine.end) {
+              return sum + Math.sqrt(
+                Math.pow(prevLine.end.x - prevLine.start.x, 2) + Math.pow(prevLine.end.y - prevLine.start.y, 2)
+              );
+            }
+            return sum;
+          }, 0);
+
         const newDot: Dot = {
           id: dots.length + 1,
           lineIndex: lineUnderCursorIndex,
-          positionPx: parseFloat(lengthToStart),
+          positionPx: totalPreviousLength + lengthToStart,
           color:'#4B0082',
           positionM: 0,
         };
@@ -280,6 +309,11 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   };
   
   const handleSave = () => {
+
+    const lastDot = dots[dots.length - 1];
+    if(lastDot && lastDot.positionM !== undefined && lastDot.positionPx !== undefined){
+      calculateScale(lastDot.positionM, lastDot.positionPx);
+    }
     saveLines(mapID, lines);
     saveDots(mapID, dots);
     saveZones(mapID, zoneLength);
