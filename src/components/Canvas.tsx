@@ -145,6 +145,35 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     return parseFloat(zoneDistance.toFixed(5));
   };  
 
+  const createCalibrationPoint = (x: number, y: number) => {
+    const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(x, y, line));
+      
+      if (lineUnderCursorIndex !== -1){
+        const line = lines[lineUnderCursorIndex];
+        const lengthToStart = Math.sqrt(Math.pow(x - line.start!.x, 2) + Math.pow(y - line.start!.y, 2));
+        const totalPreviousLength = lines
+          .slice(0, lineUnderCursorIndex) // Linhas anteriores
+          .reduce((sum, prevLine) => {
+            if (prevLine.start && prevLine.end) {
+              return sum + Math.sqrt(
+                Math.pow(prevLine.end.x - prevLine.start.x, 2) + Math.pow(prevLine.end.y - prevLine.start.y, 2)
+              );
+            }
+            return sum;
+          }, 0);
+
+        const newDot: Dot = {
+          id: dots.length + 1,
+          lineIndex: lineUnderCursorIndex,
+          positionPx: totalPreviousLength + lengthToStart,
+          color:'#4B0082',
+          positionM: 0,
+        };
+        setDots((prevDots) => [...prevDots, newDot]);
+        setTriggerRedraw(true);
+      }
+  };
+
   const calculateScale = (distanceMeters: number, distancePixels: number): number =>{
     if(distancePixels > 0){
       setScaleFactor(distanceMeters / distancePixels);
@@ -166,6 +195,8 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    setMousePos({ x, y });
 
     if (zoneState) {
         const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(x, y, line));
@@ -210,7 +241,8 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             }
         }
     } else {
-        finalizeLine(x, y);
+        finalizeLine( x, y );
+        createCalibrationPoint( x, y );
     }
   };
    
@@ -230,32 +262,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       setLines([...lines]);
       setIsDrawing(false);
     } else if (e.key === 'c' && mousePos) {
-      const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(mousePos.x, mousePos.y, line));
-      
-      if (lineUnderCursorIndex !== -1){
-        const line = lines[lineUnderCursorIndex];
-        const lengthToStart = Math.sqrt(Math.pow(mousePos.x - line.start!.x, 2) + Math.pow(mousePos.y - line.start!.y, 2));
-        const totalPreviousLength = lines
-          .slice(0, lineUnderCursorIndex) // Linhas anteriores
-          .reduce((sum, prevLine) => {
-            if (prevLine.start && prevLine.end) {
-              return sum + Math.sqrt(
-                Math.pow(prevLine.end.x - prevLine.start.x, 2) + Math.pow(prevLine.end.y - prevLine.start.y, 2)
-              );
-            }
-            return sum;
-          }, 0);
-
-        const newDot: Dot = {
-          id: dots.length + 1,
-          lineIndex: lineUnderCursorIndex,
-          positionPx: totalPreviousLength + lengthToStart,
-          color:'#4B0082',
-          positionM: 0,
-        };
-        setDots((prevDots) => [...prevDots, newDot]);
-        setTriggerRedraw(true);
-      }
+      const x = mousePos.x
+      const y = mousePos.y
+      createCalibrationPoint( x, y );
     }
   };    
 
