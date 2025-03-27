@@ -7,8 +7,7 @@ import {Dot, Line, ImageDisplayProps} from '../utils/types'
 import {saveLines, saveDots, saveZones} from '../utils/savesUtils'
 
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cursorRef = useRef<HTMLDivElement>(null);
+
   const [lines, setLines] = useState<Line[]>([]);
   const [dots, setDots] = useState<Dot[]>([]);
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
@@ -20,6 +19,10 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [zoneState, setZoneState] = useState<boolean>(false);
   const [zoneLength, setZoneLength] = useState<Dot[]>([]);
   const [scaleFactor,setScaleFactor] = useState<number>(0);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const prevLinesLength = useRef<number>(0);
   
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
@@ -126,28 +129,10 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     }
 };
 
-  
-  const calculateZoneDistance = (point1: Dot, point2: Dot): number => {
-    let zoneDistance = 0;
-  
-    if (point1.lineIndex === point2.lineIndex) {
-      return Math.abs(point2.positionPx - point1.positionPx);
-    }
-   
-    zoneDistance += lines[point1.lineIndex].length - point1.positionPx;  // distancia do primeiro ponto ate o final do vetor em que ele foi posicionado
-    
-    zoneDistance += point2.positionPx; // distancia do inicio do vetor em que o segundo ponto esta ate o ponto
-    
-    for (let i = point1.lineIndex + 1; i < point2.lineIndex; i++) { 
-      zoneDistance += lines[i].length;
-    } // distancia dos vetores intermediários
-  
-    return parseFloat(zoneDistance.toFixed(5));
-  };  
-
   const createCalibrationPoint = (x: number, y: number) => {
-    const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(x, y, line));
-      
+    
+      const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(x, y, line));
+    
       if (lineUnderCursorIndex !== -1){
         const line = lines[lineUnderCursorIndex];
         const lengthToStart = Math.sqrt(Math.pow(x - line.start!.x, 2) + Math.pow(y - line.start!.y, 2));
@@ -171,8 +156,26 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         };
         setDots((prevDots) => [...prevDots, newDot]);
         setTriggerRedraw(true);
-      }
+    };
   };
+  
+  const calculateZoneDistance = (point1: Dot, point2: Dot): number => {
+    let zoneDistance = 0;
+  
+    if (point1.lineIndex === point2.lineIndex) {
+      return Math.abs(point2.positionPx - point1.positionPx);
+    }
+   
+    zoneDistance += lines[point1.lineIndex].length - point1.positionPx;  // distancia do primeiro ponto ate o final do vetor em que ele foi posicionado
+    
+    zoneDistance += point2.positionPx; // distancia do inicio do vetor em que o segundo ponto esta ate o ponto
+    
+    for (let i = point1.lineIndex + 1; i < point2.lineIndex; i++) { 
+      zoneDistance += lines[i].length;
+    } // distancia dos vetores intermediários
+  
+    return parseFloat(zoneDistance.toFixed(5));
+  };  
 
   const calculateScale = (distanceMeters: number, distancePixels: number): number =>{
     if(distancePixels > 0){
@@ -240,9 +243,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
                 }
             }
         }
+        console.log(zoneLength);
     } else {
         finalizeLine( x, y );
-        createCalibrationPoint( x, y );
     }
   };
    
@@ -261,6 +264,17 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       setCurrentColor('#D80300');
       setLines([...lines]);
       setIsDrawing(false);
+
+      if (lines.length > prevLinesLength.current ){
+        const lastLine = lines[lines.length -1];
+        const x = lastLine.end.x;
+        const y = lastLine.end.y;
+
+        createCalibrationPoint( x, y );
+      };
+
+      prevLinesLength.current = lines.length;
+
     } else if (e.key === 'c' && mousePos) {
       const x = mousePos.x
       const y = mousePos.y
