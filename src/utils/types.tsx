@@ -14,7 +14,9 @@ export interface Dot{
   id: number;
   lineIndex: number;
   positionPx: number;
-  positionM?:number;
+  absPositionPx?: number;
+  positionM?: number;
+  positionAbsM?: number;
   zoneID?:number;
   color:string;
   zoneDistance?: number;
