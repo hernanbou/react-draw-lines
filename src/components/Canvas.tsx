@@ -9,7 +9,8 @@ import {saveLines, saveDots, saveZones} from '../utils/savesUtils'
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
   const [lines, setLines] = useState<Line[]>([]);
-  const [dots, setDots] = useState<Dot[]>([]);
+  const [calibrationPoint, setCalibrationPoint] = useState<Dot[]>([]);
+  const [zoneList, setZoneList] = useState<Dot[]>([]);
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<string>('#D80300');
@@ -17,8 +18,11 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [triggerRedraw, setTriggerRedraw] = useState<boolean>(false);
   const [zoneState, setZoneState] = useState<boolean>(false);
-  const [zoneLength, setZoneLength] = useState<Dot[]>([]);
-  const [scaleFactor,setScaleFactor] = useState<number>(0);
+  //const [currentScale, setCurrentScale] = useState<number>(0);
+  const [pxAbsPCalibPost, setPxAbsPCalibPost] = useState<number>(0);
+  const [mAbsPCalibPost, setMAbsPCalibPost] = useState<number>(0);
+  const [pxAbsPCalibAnt, setPxAbsPCalibAnt] = useState<number>(0);
+  const [mAbsPCalibAnt, setMAbsPCalibAnt] = useState<number>(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -60,7 +64,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         });
 
         // desenha os pontos de calibracao
-        dots.forEach(({ lineIndex, positionPx }) => {
+        calibrationPoint.forEach(({ lineIndex, positionPx }) => {
             const line = lines[lineIndex];
             if (line.start && line.end) {
                 const { x: startX, y: startY } = line.start;
@@ -77,7 +81,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         });
 
         // desenha as traves perpendiculares
-        zoneLength.forEach(({ lineIndex, positionPx }) => {
+        zoneList.forEach(({ lineIndex, positionPx }) => {
             const line = lines[lineIndex];
             if (line.start && line.end) {
                 const { x: startX, y: startY } = line.start;
@@ -146,15 +150,17 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             }
             return sum;
           }, 0);
+        
+        const position = totalPreviousLength + lengthToStart;  
 
         const newDot: Dot = {
-          id: dots.length + 1,
+          id: calibrationPoint.length + 1,
           lineIndex: lineUnderCursorIndex,
-          positionPx: totalPreviousLength + lengthToStart,
+          positionPx: position === 0 ? 1 : position,
           color:'#4B0082',
           positionM: 0,
         };
-        setDots((prevDots) => [...prevDots, newDot]);
+        setCalibrationPoint((prevDots) => [...prevDots, newDot]);
         setTriggerRedraw(true);
     };
   };
@@ -177,18 +183,36 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     return parseFloat(zoneDistance.toFixed(5));
   };  
 
-  const calculateScale = (distanceMeters: number, distancePixels: number): number =>{
-    if(distancePixels > 0){
-      setScaleFactor(distanceMeters / distancePixels);
+  const findCalibrationPoint = ( Zone: Dot ) => {
+    
+    const zonePoint = Zone.absPositionPx;
+
+    if(!calibrationPoint.length) return;
+
+    const sortCalibrationPoint = calibrationPoint.sort((a, b) => (a.positionPx as number) - (b.positionPx as number));
+
+    const nextPoint = sortCalibrationPoint.find(point => (point.positionPx ?? 0) > (zonePoint ?? 0));
+
+    if(nextPoint?.positionPx !== undefined && nextPoint?.positionM !== undefined){
+      setPxAbsPCalibPost(nextPoint.positionPx);
+      setMAbsPCalibPost(nextPoint.positionM);
     }
-    return 0
+
+    const prevPoint = sortCalibrationPoint.reverse().find(point => (point.positionPx ?? 0) < (zonePoint ?? 0));
+
+    if(prevPoint?.positionPx !== undefined && prevPoint?.positionM !== undefined){
+      setPxAbsPCalibAnt(prevPoint.positionPx);
+      setMAbsPCalibAnt(prevPoint.positionM);
+    }
   };
 
-  const convertPixelsToMeters = (distancePixels: number): number => {
-    if(scaleFactor !== null){
-      return distancePixels * scaleFactor;
-    }
-    return 0
+  const convertPxToMeters = ( Zone: Dot ) => {
+      
+    const relativeMeters = mAbsPCalibPost - mAbsPCalibAnt;
+    const relativePixels = pxAbsPCalibPost - pxAbsPCalibAnt;
+    const relativeConversion = relativeMeters / relativePixels;
+
+    Zone.positionAbsM = (Zone.absPositionPx as number) * relativeConversion;
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -208,18 +232,32 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             const line = lines[lineUnderCursorIndex];
             if (line.start && line.end) {
                 const lengthToStart = Math.sqrt(Math.pow(x - line.start.x, 2) + Math.pow(y - line.start.y, 2)).toFixed(5);
-                const calculatePositonMeters = convertPixelsToMeters(parseFloat(lengthToStart));
-                console.log(calculatePositonMeters)
+                const totalPreviousLength = lines
+                  .slice(0, lineUnderCursorIndex) // Linhas anteriores
+                  .reduce((sum, prevLine) => {
+                    if (prevLine.start && prevLine.end) {
+                      return sum + Math.sqrt(
+                        Math.pow(prevLine.end.x - prevLine.start.x, 2) + Math.pow(prevLine.end.y - prevLine.start.y, 2)
+                      );
+                    }
+                    return sum;
+                  }, 0);
+                const absoluteDistance = totalPreviousLength + (parseFloat(lengthToStart))
+                const calculatePositonMeters = 0;
                 const newDot: Dot = {
-                    id: zoneLength.length + 1,
+                    id: zoneList.length + 1,
                     lineIndex: lineUnderCursorIndex,
                     positionPx: parseFloat(lengthToStart),
-                    positionM: calculatePositonMeters,
+                    absPositionPx: absoluteDistance,
+                    positionAbsM: calculatePositonMeters,
                     color: '#FDEE2F',
-                    zoneID: zoneLength.length + 1,
+                    zoneID: zoneList.length + 1,
                 };
 
-                setZoneLength((prevZoneLength) => {
+                findCalibrationPoint(newDot);
+                convertPxToMeters(newDot);
+
+                setZoneList((prevZoneLength) => {
                     const updatedZoneLength = [...prevZoneLength, newDot];
                     if (updatedZoneLength.length === 1) {
                         updatedZoneLength[0].zoneDistance = newDot.positionPx;
@@ -243,9 +281,17 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
                 }
             }
         }
-        console.log(zoneLength);
+        console.log(zoneList);
     } else {
         finalizeLine( x, y );
+
+        if (lines.length > prevLinesLength.current && calibrationPoint.length < 1){
+          const firstLine = lines[0];
+          const x = firstLine.start.x;
+          const y = firstLine.start.y;
+
+          createCalibrationPoint( x, y )
+        };
     }
   };
    
@@ -314,7 +360,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
   const handleDotInputChange = (e:React.ChangeEvent<HTMLInputElement>, dotID: number) => {
     const newPositionM = parseFloat(e.target.value);
-    setDots((prevDots) =>
+    setCalibrationPoint((prevDots) =>
       prevDots.map((dot) =>
       dot.id === dotID ? {...dot, positionM: newPositionM} : dot
       )
@@ -333,13 +379,9 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   
   const handleSave = () => {
 
-    const lastDot = dots[dots.length - 1];
-    if(lastDot && lastDot.positionM !== undefined && lastDot.positionPx !== undefined){
-      calculateScale(lastDot.positionM, lastDot.positionPx);
-    }
     saveLines(mapID, lines);
-    saveDots(mapID, dots);
-    saveZones(mapID, zoneLength);
+    saveDots(mapID, calibrationPoint);
+    saveZones(mapID, zoneList);
   };
 
   const fetchMapData = useCallback(async () => {
@@ -374,26 +416,26 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       const response = await fetch(`http://localhost:5000/maps/${mapID}/point_list`);
       const pointData: Dot[] = await response.json();
       
-      setDots(pointData);
+      setCalibrationPoint(pointData);
     } catch (error) {
       console.error('Erro ao buscar lista de pontos', error);
     }
-  }, [mapID, setDots]);
+  }, [mapID, setCalibrationPoint]);
   
   const fetchZoneList = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}/zone_list`);
       const zoneData: Dot[] = await response.json();
       
-      setZoneLength(zoneData);
+      setZoneList(zoneData);
     } catch (error) {
       console.error('Erro ao buscar lista de pontos', error);
     }
-  }, [mapID, setZoneLength]); 
+  }, [mapID, setZoneList]); 
 
   const resetStates = () => {
     setLines([]);
-    setDots([]);
+    setCalibrationPoint([]);
     setCurrentStart(null);
     setMousePos(null);
   };
@@ -418,7 +460,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [lines, currentStart, mousePos, dots]);  
+  }, [lines, currentStart, mousePos, calibrationPoint]);  
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -466,10 +508,10 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             </div>
             <div className='dots-info'>
               <div>
-                {dots.length === 0 ? (
+                {calibrationPoint.length === 0 ? (
                   <div>Nenhum ponto foi adicionado.</div>
                 ) : (
-                  dots.map((dot, i) => (
+                  calibrationPoint.map((dot, i) => (
                     <div key={i} className='dots-container'>
                       <div>Ponto {dot.id}:</div>
                       <div>Vetor número <span>{dot.lineIndex + 1}</span></div>
