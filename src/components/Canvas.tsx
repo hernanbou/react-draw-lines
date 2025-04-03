@@ -19,10 +19,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [triggerRedraw, setTriggerRedraw] = useState<boolean>(false);
   const [zoneState, setZoneState] = useState<boolean>(false);
   //const [currentScale, setCurrentScale] = useState<number>(0);
-  const [pxAbsPCalibPost, setPxAbsPCalibPost] = useState<number>(0);
-  const [mAbsPCalibPost, setMAbsPCalibPost] = useState<number>(0);
-  const [pxAbsPCalibAnt, setPxAbsPCalibAnt] = useState<number>(0);
-  const [mAbsPCalibAnt, setMAbsPCalibAnt] = useState<number>(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -183,37 +179,39 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     return parseFloat(zoneDistance.toFixed(5));
   };  
 
-  const findCalibrationPoint = ( Zone: Dot ) => {
-    
+  const findCalibrationPoint = (Zone: Dot) => {
     const zonePoint = Zone.absPositionPx;
-
-    if(!calibrationPoint.length) return;
-
-    const sortCalibrationPoint = calibrationPoint.sort((a, b) => (a.positionPx as number) - (b.positionPx as number));
-
-    const nextPoint = sortCalibrationPoint.find(point => (point.positionPx ?? 0) > (zonePoint ?? 0));
-
-    if(nextPoint?.positionPx !== undefined && nextPoint?.positionM !== undefined){
-      setPxAbsPCalibPost(nextPoint.positionPx);
-      setMAbsPCalibPost(nextPoint.positionM);
-    }
-
-    const prevPoint = sortCalibrationPoint.reverse().find(point => (point.positionPx ?? 0) < (zonePoint ?? 0));
-
-    if(prevPoint?.positionPx !== undefined && prevPoint?.positionM !== undefined){
-      setPxAbsPCalibAnt(prevPoint.positionPx);
-      setMAbsPCalibAnt(prevPoint.positionM);
-    }
+  
+    if (!calibrationPoint.length) return null;
+  
+    const sortedCalibrationPoint = [...calibrationPoint].sort((a, b) => (a.positionPx as number) - (b.positionPx as number));
+    const nextPoint = sortedCalibrationPoint.find(point => (point.positionPx ?? 0) > (zonePoint ?? 0));
+   
+    const reversedCalibrationPoint = [...sortedCalibrationPoint].reverse();
+    const prevPoint = reversedCalibrationPoint.find(point => (point.positionPx ?? 0) < (zonePoint ?? 0));
+  
+    return {
+      pxAbsPCalibPost: nextPoint?.positionPx ?? null,
+      mAbsPCalibPost: nextPoint?.positionM ?? null,
+      pxAbsPCalibAnt: prevPoint?.positionPx ?? null,
+      mAbsPCalibAnt: prevPoint?.positionM ?? null
+    };
   };
+  
 
-  const convertPxToMeters = ( Zone: Dot ) => {
-      
+  const convertPxToMeters = (
+    zone: Dot,
+    pxAbsPCalibPost: number,
+    mAbsPCalibPost: number,
+    pxAbsPCalibAnt: number,
+    mAbsPCalibAnt: number
+  ) => {
     const relativeMeters = mAbsPCalibPost - mAbsPCalibAnt;
     const relativePixels = pxAbsPCalibPost - pxAbsPCalibAnt;
     const relativeConversion = relativeMeters / relativePixels;
-
-    Zone.positionAbsM = (Zone.absPositionPx as number) * relativeConversion;
-  };
+  
+    zone.positionAbsM = (zone.absPositionPx as number) * relativeConversion;
+  };  
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -253,9 +251,19 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
                     color: '#FDEE2F',
                     zoneID: zoneList.length + 1,
                 };
+                
+                const calibrationData = findCalibrationPoint(newDot);
 
-                findCalibrationPoint(newDot);
-                convertPxToMeters(newDot);
+                if (calibrationData) {
+                  const { 
+                    pxAbsPCalibPost, 
+                    mAbsPCalibPost, 
+                    pxAbsPCalibAnt, 
+                    mAbsPCalibAnt 
+                  } = calibrationData;
+
+                  convertPxToMeters(newDot, pxAbsPCalibPost!, mAbsPCalibPost!, pxAbsPCalibAnt!, mAbsPCalibAnt!);
+                };
 
                 setZoneList((prevZoneLength) => {
                     const updatedZoneLength = [...prevZoneLength, newDot];
