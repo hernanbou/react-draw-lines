@@ -1,3 +1,23 @@
+import {Zone} from '../utils/types'
+
+export const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
+    return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
+};
+
+export const convertPxToMeters = (
+    zone: Zone,
+    pxAbsPCalibPost: number,
+    mAbsPCalibPost: number,
+    pxAbsPCalibAnt: number,
+    mAbsPCalibAnt: number
+        ) => {
+        const relativeMeters = mAbsPCalibPost - mAbsPCalibAnt;
+        const relativePixels = pxAbsPCalibPost - pxAbsPCalibAnt;
+        const relativeConversion = relativeMeters / relativePixels;
+
+        zone.positionAbsM = (zone.absPositionPx as number) * relativeConversion;
+};
+
 export const drawPerpendicularLine = (ctx: CanvasRenderingContext2D, line: any, pointX: number, pointY: number) => {
     const dx = line.end.x - line.start.x;
     const dy = line.end.y - line.start.y;

@@ -1,4 +1,4 @@
-import {Dot, Line} from '../utils/types'
+import {Calibration, Zone, Line} from '../utils/types'
 
 export const saveLines = async (mapID: number, lines: Line[]) => {
   
@@ -21,7 +21,7 @@ export const saveLines = async (mapID: number, lines: Line[]) => {
     }
   };   
 
-  export const saveDots = async (mapID: number, dots: Dot[]) => {
+  export const saveDots = async (mapID: number, dots: Calibration[]) => {
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
         method: 'PUT',
@@ -41,7 +41,7 @@ export const saveLines = async (mapID: number, lines: Line[]) => {
     }
   };
 
-  export const saveZones = async (mapID: number, zoneLength: Dot[]) => {
+  export const saveZones = async (mapID: number, zoneLength: Zone[]) => {
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}`, {
         method: 'PUT',

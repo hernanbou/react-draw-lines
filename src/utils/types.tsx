@@ -10,14 +10,18 @@ export interface Line {
   index: number;
 }
 
-export interface Dot{
+interface BaseDot{
   id: number;
   lineIndex: number;
   positionPx: number;
-  absPositionPx?: number;
-  positionM?: number;
-  positionAbsM?: number;
-  zoneID?:number;
   color:string;
+}
+export interface Calibration extends BaseDot{
+  positionM?: number;
+}
+
+export interface Zone extends BaseDot{
+  absPositionPx?: number;
+  positionAbsM?: number;
   zoneDistance?: number;
 }

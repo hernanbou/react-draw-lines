@@ -1,16 +1,16 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import '../styles/canvas.scss';
 
-import {drawPerpendicularLine} from '../utils/drawPerpendicularLine';
+import {drawPerpendicularLine, convertPxToMeters, calculateLineLength} from '../utils/calculations';
 import {isMouseOverLine} from '../utils/isMouseOverLine'
-import {Dot, Line, ImageDisplayProps} from '../utils/types'
+import {Calibration, Zone, Line, ImageDisplayProps} from '../utils/types'
 import {saveLines, saveDots, saveZones} from '../utils/savesUtils'
 
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
   const [lines, setLines] = useState<Line[]>([]);
-  const [calibrationPoint, setCalibrationPoint] = useState<Dot[]>([]);
-  const [zoneList, setZoneList] = useState<Dot[]>([]);
+  const [calibrationPoint, setCalibrationPoint] = useState<Calibration[]>([]);
+  const [zoneList, setZoneList] = useState<Zone[]>([]);
   const [currentStart, setCurrentStart] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [currentColor, setCurrentColor] = useState<string>('#D80300');
@@ -18,7 +18,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [triggerRedraw, setTriggerRedraw] = useState<boolean>(false);
   const [zoneState, setZoneState] = useState<boolean>(false);
-  //const [currentScale, setCurrentScale] = useState<number>(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -106,10 +105,6 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     };
   };
 
-  const calculateLineLength = (start: { x: number; y: number }, end: { x: number; y: number }) => {
-    return Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)).toFixed(5);
-  };
-
   const finalizeLine = (x: number, y: number) => {
     if (currentStart) {
       const length = calculateLineLength(currentStart, { x, y });
@@ -149,7 +144,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         
         const position = totalPreviousLength + lengthToStart;  
 
-        const newDot: Dot = {
+        const newDot: Calibration = {
           id: calibrationPoint.length + 1,
           lineIndex: lineUnderCursorIndex,
           positionPx: position === 0 ? 1 : position,
@@ -159,59 +154,44 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
         setCalibrationPoint((prevDots) => [...prevDots, newDot]);
         setTriggerRedraw(true);
     };
-  };
-  
-  const calculateZoneDistance = (point1: Dot, point2: Dot): number => {
-    let zoneDistance = 0;
-  
-    if (point1.lineIndex === point2.lineIndex) {
-      return Math.abs(point2.positionPx - point1.positionPx);
-    }
-   
-    zoneDistance += lines[point1.lineIndex].length - point1.positionPx;  // distancia do primeiro ponto ate o final do vetor em que ele foi posicionado
-    
-    zoneDistance += point2.positionPx; // distancia do inicio do vetor em que o segundo ponto esta ate o ponto
-    
-    for (let i = point1.lineIndex + 1; i < point2.lineIndex; i++) { 
-      zoneDistance += lines[i].length;
-    } // distancia dos vetores intermediários
-  
-    return parseFloat(zoneDistance.toFixed(5));
   };  
 
-  const findCalibrationPoint = (Zone: Dot) => {
-    const zonePoint = Zone.absPositionPx;
+const calculateZoneDistance = (point1:Zone , point2: Zone): number => {
+  let zoneDistance = 0;
+
+  if (point1.lineIndex === point2.lineIndex) {
+  return Math.abs(point2.positionPx - point1.positionPx);
+  }
   
-    if (!calibrationPoint.length) return null;
+  zoneDistance += lines[point1.lineIndex].length - point1.positionPx;  // distancia do primeiro ponto ate o final do vetor em que ele foi posicionado
   
-    const sortedCalibrationPoint = [...calibrationPoint].sort((a, b) => (a.positionPx as number) - (b.positionPx as number));
-    const nextPoint = sortedCalibrationPoint.find(point => (point.positionPx ?? 0) > (zonePoint ?? 0));
-   
-    const reversedCalibrationPoint = [...sortedCalibrationPoint].reverse();
-    const prevPoint = reversedCalibrationPoint.find(point => (point.positionPx ?? 0) < (zonePoint ?? 0));
+  zoneDistance += point2.positionPx; // distancia do inicio do vetor em que o segundo ponto esta ate o ponto
   
-    return {
+  for (let i = point1.lineIndex + 1; i < point2.lineIndex; i++) { 
+  zoneDistance += lines[i].length;
+  } // distancia dos vetores intermediários
+
+  return parseFloat(zoneDistance.toFixed(5));
+};  
+
+const findCalibrationPoint = (Zone: Zone) => {
+  const zonePoint = Zone.absPositionPx;
+
+  if (!calibrationPoint.length) return null;
+
+  const sortedCalibrationPoint = [...calibrationPoint].sort((a, b) => (a.positionPx as number) - (b.positionPx as number));
+  const nextPoint = sortedCalibrationPoint.find(point => (point.positionPx ?? 0) > (zonePoint ?? 0));
+  
+  const reversedCalibrationPoint = [...sortedCalibrationPoint].reverse();
+  const prevPoint = reversedCalibrationPoint.find(point => (point.positionPx ?? 0) < (zonePoint ?? 0));
+
+  return {
       pxAbsPCalibPost: nextPoint?.positionPx ?? null,
       mAbsPCalibPost: nextPoint?.positionM ?? null,
       pxAbsPCalibAnt: prevPoint?.positionPx ?? null,
       mAbsPCalibAnt: prevPoint?.positionM ?? null
-    };
   };
-  
-
-  const convertPxToMeters = (
-    zone: Dot,
-    pxAbsPCalibPost: number,
-    mAbsPCalibPost: number,
-    pxAbsPCalibAnt: number,
-    mAbsPCalibAnt: number
-  ) => {
-    const relativeMeters = mAbsPCalibPost - mAbsPCalibAnt;
-    const relativePixels = pxAbsPCalibPost - pxAbsPCalibAnt;
-    const relativeConversion = relativeMeters / relativePixels;
-  
-    zone.positionAbsM = (zone.absPositionPx as number) * relativeConversion;
-  };  
+};
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -242,14 +222,13 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
                   }, 0);
                 const absoluteDistance = totalPreviousLength + (parseFloat(lengthToStart))
                 const calculatePositonMeters = 0;
-                const newDot: Dot = {
+                const newDot: Zone = {
                     id: zoneList.length + 1,
                     lineIndex: lineUnderCursorIndex,
                     positionPx: parseFloat(lengthToStart),
                     absPositionPx: absoluteDistance,
                     positionAbsM: calculatePositonMeters,
                     color: '#FDEE2F',
-                    zoneID: zoneList.length + 1,
                 };
                 
                 const calibrationData = findCalibrationPoint(newDot);
@@ -422,7 +401,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const fetchPointList = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}/point_list`);
-      const pointData: Dot[] = await response.json();
+      const pointData: Calibration[] = await response.json();
       
       setCalibrationPoint(pointData);
     } catch (error) {
@@ -433,7 +412,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const fetchZoneList = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:5000/maps/${mapID}/zone_list`);
-      const zoneData: Dot[] = await response.json();
+      const zoneData: Zone[] = await response.json();
       
       setZoneList(zoneData);
     } catch (error) {
