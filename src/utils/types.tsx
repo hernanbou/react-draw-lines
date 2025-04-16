@@ -17,11 +17,11 @@ interface BaseDot{
   color:string;
 }
 export interface Calibration extends BaseDot{
-  positionM?: number;
+  positionMeters?: number;
 }
 
 export interface Zone extends BaseDot{
-  absPositionPx?: number;
-  positionAbsM?: number;
+  positionPxAbsolute?: number;
+  positionMetersAbsolute?: number;
   zoneDistance?: number;
 }

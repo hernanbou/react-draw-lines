@@ -15,7 +15,7 @@ export const convertPxToMeters = (
         const relativePixels = pxAbsPCalibPost - pxAbsPCalibAnt;
         const relativeConversion = relativeMeters / relativePixels;
 
-        zone.positionAbsM = (zone.absPositionPx as number) * relativeConversion;
+        zone.positionMetersAbsolute = (zone.positionPxAbsolute as number) * relativeConversion;
 };
 
 export const drawPerpendicularLine = (ctx: CanvasRenderingContext2D, line: any, pointX: number, pointY: number) => {

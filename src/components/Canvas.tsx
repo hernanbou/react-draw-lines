@@ -149,7 +149,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
           lineIndex: lineUnderCursorIndex,
           positionPx: position === 0 ? 1 : position,
           color:'#4B0082',
-          positionM: 0,
+          positionMeters: 0,
         };
         setCalibrationPoint((prevDots) => [...prevDots, newDot]);
         setTriggerRedraw(true);
@@ -175,7 +175,7 @@ const calculateZoneDistance = (point1:Zone , point2: Zone): number => {
 };  
 
 const findCalibrationPoint = (Zone: Zone) => {
-  const zonePoint = Zone.absPositionPx;
+  const zonePoint = Zone.positionPxAbsolute;
 
   if (!calibrationPoint.length) return null;
 
@@ -187,9 +187,9 @@ const findCalibrationPoint = (Zone: Zone) => {
 
   return {
       pxAbsPCalibPost: nextPoint?.positionPx ?? null,
-      mAbsPCalibPost: nextPoint?.positionM ?? null,
+      mAbsPCalibPost: nextPoint?.positionMeters ?? null,
       pxAbsPCalibAnt: prevPoint?.positionPx ?? null,
-      mAbsPCalibAnt: prevPoint?.positionM ?? null
+      mAbsPCalibAnt: prevPoint?.positionMeters ?? null
   };
 };
 
@@ -221,13 +221,12 @@ const findCalibrationPoint = (Zone: Zone) => {
                     return sum;
                   }, 0);
                 const absoluteDistance = totalPreviousLength + (parseFloat(lengthToStart))
-                const calculatePositonMeters = 0;
                 const newDot: Zone = {
                     id: zoneList.length + 1,
                     lineIndex: lineUnderCursorIndex,
                     positionPx: parseFloat(lengthToStart),
-                    absPositionPx: absoluteDistance,
-                    positionAbsM: calculatePositonMeters,
+                    positionPxAbsolute: absoluteDistance,
+                    positionMetersAbsolute: 0,
                     color: '#FDEE2F',
                 };
                 
@@ -349,7 +348,7 @@ const findCalibrationPoint = (Zone: Zone) => {
     const newPositionM = parseFloat(e.target.value);
     setCalibrationPoint((prevDots) =>
       prevDots.map((dot) =>
-      dot.id === dotID ? {...dot, positionM: newPositionM} : dot
+      dot.id === dotID ? {...dot, positionMeters: newPositionM} : dot
       )
     );
   };
@@ -508,7 +507,7 @@ const findCalibrationPoint = (Zone: Zone) => {
                         <input 
                           type="number"
                           min="0"
-                          value={dot.positionM}
+                          value={dot.positionMeters}
                           onChange={(e) => handleDotInputChange(e, dot.id)}
                           placeholder='Metros'
                           className='dot-input'
