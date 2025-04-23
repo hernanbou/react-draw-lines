@@ -21,7 +21,10 @@ export interface Calibration extends BaseDot{
 }
 
 export interface Zone extends BaseDot{
-  positionPxAbsolute?: number;
-  positionMetersAbsolute?: number;
-  zoneDistance?: number;
+  positionZoneEndPixelsAbsolute?: number;
+  positionZoneStartPixelsAbsolute?: number;
+  positionZoneEndMetersAbsolute?: number;
+  positionZoneStartMetersAbsolute?: number;
+  positionZoneTotalLengthMeters?: number;
+  positionZoneTotalLengthPixels ?: number;
 }

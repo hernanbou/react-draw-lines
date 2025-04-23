@@ -168,14 +168,14 @@ const calculateZoneDistance = (point1:Zone , point2: Zone): number => {
   zoneDistance += point2.positionPx; // distancia do inicio do vetor em que o segundo ponto esta ate o ponto
   
   for (let i = point1.lineIndex + 1; i < point2.lineIndex; i++) { 
-  zoneDistance += lines[i].length;
+    zoneDistance += lines[i].length;
   } // distancia dos vetores intermediários
 
   return parseFloat(zoneDistance.toFixed(5));
 };  
 
 const findCalibrationPoint = (Zone: Zone) => {
-  const zonePoint = Zone.positionPxAbsolute;
+  const zonePoint = Zone.positionZoneEndPixelsAbsolute;
 
   if (!calibrationPoint.length) return null;
 
@@ -220,13 +220,15 @@ const findCalibrationPoint = (Zone: Zone) => {
                     }
                     return sum;
                   }, 0);
-                const absoluteDistance = totalPreviousLength + (parseFloat(lengthToStart))
+                  
+                const absoluteDistance = totalPreviousLength + (parseFloat(lengthToStart));
+
                 const newDot: Zone = {
                     id: zoneList.length + 1,
                     lineIndex: lineUnderCursorIndex,
                     positionPx: parseFloat(lengthToStart),
-                    positionPxAbsolute: absoluteDistance,
-                    positionMetersAbsolute: 0,
+                    positionZoneEndPixelsAbsolute: absoluteDistance,
+                    positionZoneEndMetersAbsolute: 0,
                     color: '#FDEE2F',
                 };
                 
@@ -246,12 +248,12 @@ const findCalibrationPoint = (Zone: Zone) => {
                 setZoneList((prevZoneLength) => {
                     const updatedZoneLength = [...prevZoneLength, newDot];
                     if (updatedZoneLength.length === 1) {
-                        updatedZoneLength[0].zoneDistance = newDot.positionPx;
+                        updatedZoneLength[0].positionZoneTotalLengthPixels = newDot.positionPx;
                     } else if (updatedZoneLength.length > 1) {
                         const lastDot = updatedZoneLength[updatedZoneLength.length - 1];
                         const secondLastDot = updatedZoneLength[updatedZoneLength.length - 2];
                         const totalDistance = calculateZoneDistance(secondLastDot, lastDot);
-                        updatedZoneLength[updatedZoneLength.length - 1].zoneDistance = totalDistance;
+                        updatedZoneLength[updatedZoneLength.length - 1].positionZoneTotalLengthPixels = totalDistance;
                     }
                     return updatedZoneLength;
                 });
