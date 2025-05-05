@@ -17,14 +17,14 @@ interface BaseDot{
   color:string;
 }
 export interface Calibration extends BaseDot{
-  positionMeters?: number;
+  positionMeters: number;
 }
 
 export interface Zone extends BaseDot{
-  positionZoneEndPixelsAbsolute?: number;
-  positionZoneStartPixelsAbsolute?: number;
-  positionZoneEndMetersAbsolute?: number;
-  positionZoneStartMetersAbsolute?: number;
-  positionZoneTotalLengthMeters?: number;
-  positionZoneTotalLengthPixels ?: number;
+  positionZoneEndPixelsAbsolute: number;
+  positionZoneStartPixelsAbsolute: number;
+  positionZoneEndMetersAbsolute: number;
+  positionZoneStartMetersAbsolute: number;
+  positionZoneTotalLengthMeters: number;
+  positionZoneTotalLengthPixels: number;
 }
