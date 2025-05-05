@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import '../styles/canvas.scss';
 
-import {drawPerpendicularLine, convertPxToMeters, calculateLineLength} from '../utils/calculations';
+import {drawPerpendicularLine, calculateLineLength} from '../utils/calculations';
 import {isMouseOverLine} from '../utils/isMouseOverLine'
 import {Calibration, Zone, Line, ImageDisplayProps} from '../utils/types'
 import {saveLines, saveDots, saveZones} from '../utils/savesUtils'
@@ -60,19 +60,37 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
         // desenha os pontos de calibracao
         calibrationPoint.forEach(({ lineIndex, positionPx }) => {
-            const line = lines[lineIndex];
-            if (line.start && line.end) {
-                const { x: startX, y: startY } = line.start;
-                const { x: endX, y: endY } = line.end;
-                const ratio = positionPx / line.length;
-                const pointX = startX + (endX - startX) * ratio;
-                const pointY = startY + (endY - startY) * ratio;
-                
-                ctx.beginPath();
-                ctx.arc(pointX, pointY, 4, 0, Math.PI * 2);
-                ctx.fillStyle = '#4B0082';
-                ctx.fill();
-            }
+          const line = lines[lineIndex];
+          if (line.start && line.end) {
+            const { x: startX, y: startY } = line.start;
+            const { x: endX, y: endY } = line.end;
+            const lineLength = Math.sqrt(
+              Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2)
+            );
+
+            const previousLength = lines
+              .slice(0, lineIndex)
+              .reduce((sum, line) => {
+                if (line.start && line.end) {
+                  return sum + Math.sqrt(
+                    Math.pow(line.end.x - line.start.x, 2) +
+                    Math.pow(line.end.y - line.start.y, 2)
+                  );
+                }
+                return sum;
+              }, 0);
+
+            const relativePositionPx = positionPx - previousLength;
+            const ratio = relativePositionPx / lineLength;
+
+            const pointX = startX + (endX - startX) * ratio;
+            const pointY = startY + (endY - startY) * ratio;
+
+            ctx.beginPath();
+            ctx.arc(pointX, pointY, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#4B0082';
+            ctx.fill();
+          }
         });
 
         // desenha as traves perpendiculares
@@ -112,7 +130,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
       const newLine: Line = {
         start: currentStart,
         end: { x, y },
-        length: parseFloat(length),
+        length: length,
         color: currentColor,
         index: newIndex
       };
@@ -142,7 +160,7 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
             return sum;
           }, 0);
         
-        const position = totalPreviousLength + lengthToStart;  
+        const position = Math.round(totalPreviousLength + lengthToStart);  
 
         const newDot: Calibration = {
           id: calibrationPoint.length + 1,
@@ -156,41 +174,45 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
     };
   };  
 
-const calculateZoneDistance = (point1:Zone , point2: Zone): number => {
-  let zoneDistance = 0;
-
-  if (point1.lineIndex === point2.lineIndex) {
-  return Math.abs(point2.positionPx - point1.positionPx);
-  }
-  
-  zoneDistance += lines[point1.lineIndex].length - point1.positionPx;  // distancia do primeiro ponto ate o final do vetor em que ele foi posicionado
-  
-  zoneDistance += point2.positionPx; // distancia do inicio do vetor em que o segundo ponto esta ate o ponto
-  
-  for (let i = point1.lineIndex + 1; i < point2.lineIndex; i++) { 
-    zoneDistance += lines[i].length;
-  } // distancia dos vetores intermediários
-
-  return parseFloat(zoneDistance.toFixed(5));
-};  
-
-const findCalibrationPoint = (Zone: Zone) => {
-  const zonePoint = Zone.positionZoneEndPixelsAbsolute;
+const convertZonePxToMeters = (Zone: Zone) => {
 
   if (!calibrationPoint.length) return null;
 
+  const endZonePoint = Zone.positionZoneEndPixelsAbsolute;
+  const startZonePoint = Zone.positionZoneStartPixelsAbsolute;
+
+
   const sortedCalibrationPoint = [...calibrationPoint].sort((a, b) => (a.positionPx as number) - (b.positionPx as number));
-  const nextPoint = sortedCalibrationPoint.find(point => (point.positionPx ?? 0) > (zonePoint ?? 0));
+  const nextEndPoint = sortedCalibrationPoint.find(point => (point.positionPx ?? 0) > (endZonePoint ?? 0));
   
   const reversedCalibrationPoint = [...sortedCalibrationPoint].reverse();
-  const prevPoint = reversedCalibrationPoint.find(point => (point.positionPx ?? 0) < (zonePoint ?? 0));
+  const prevEndPoint = reversedCalibrationPoint.find(point => (point.positionPx ?? 0) < (endZonePoint ?? 0));
 
-  return {
-      pxAbsPCalibPost: nextPoint?.positionPx ?? null,
-      mAbsPCalibPost: nextPoint?.positionMeters ?? null,
-      pxAbsPCalibAnt: prevPoint?.positionPx ?? null,
-      mAbsPCalibAnt: prevPoint?.positionMeters ?? null
+  const calibrationPointsInZone = sortedCalibrationPoint.filter(point => {
+    const px = point.positionPx ?? -1;
+    return px > startZonePoint && px < endZonePoint;
+  });
+
+  if (calibrationPointsInZone.length > 0){
+
+    const postPixelDiff = nextEndPoint!.positionPx - prevEndPoint!.positionPx;
+    const postMetersDiff = nextEndPoint!.positionMeters - prevEndPoint!.positionMeters;
+    const postConversion = postMetersDiff / postPixelDiff;
+
+    const partialPostPixelDiff = Zone.positionZoneEndPixelsAbsolute - prevEndPoint!.positionPx;
+
+    Zone.positionZoneEndMetersAbsolute  = Math.round(prevEndPoint!.positionMeters + (partialPostPixelDiff * postConversion));
+
+  } else {
+    const pixelDiff = nextEndPoint!.positionPx - prevEndPoint!.positionPx;
+    const metersDiff = nextEndPoint!.positionMeters - prevEndPoint!.positionMeters;
+    const conversion = metersDiff / pixelDiff;
+
+    Zone.positionZoneEndMetersAbsolute = Math.round(Zone.positionZoneStartMetersAbsolute + (Zone.positionZoneTotalLengthPixels * conversion));
   };
+
+  Zone.positionZoneTotalLengthMeters = Zone.positionZoneEndMetersAbsolute - Zone.positionZoneStartMetersAbsolute;
+
 };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -204,72 +226,70 @@ const findCalibrationPoint = (Zone: Zone) => {
     setMousePos({ x, y });
 
     if (zoneState) {
-        const lineUnderCursorIndex = lines.findIndex(line => line.start && line.end && isMouseOverLine(x, y, line));
+      const lineUnderCursorIndex = lines.findIndex((line) => line.start && line.end && isMouseOverLine(x, y, line));
+    
+      if (lineUnderCursorIndex !== -1) {
 
-        if (lineUnderCursorIndex !== -1) {
-            const line = lines[lineUnderCursorIndex];
-            if (line.start && line.end) {
-                const lengthToStart = Math.sqrt(Math.pow(x - line.start.x, 2) + Math.pow(y - line.start.y, 2)).toFixed(5);
-                const totalPreviousLength = lines
-                  .slice(0, lineUnderCursorIndex) // Linhas anteriores
-                  .reduce((sum, prevLine) => {
-                    if (prevLine.start && prevLine.end) {
-                      return sum + Math.sqrt(
-                        Math.pow(prevLine.end.x - prevLine.start.x, 2) + Math.pow(prevLine.end.y - prevLine.start.y, 2)
-                      );
-                    }
-                    return sum;
-                  }, 0);
-                  
-                const absoluteDistance = totalPreviousLength + (parseFloat(lengthToStart));
+        const line = lines[lineUnderCursorIndex];
 
-                const newDot: Zone = {
-                    id: zoneList.length + 1,
-                    lineIndex: lineUnderCursorIndex,
-                    positionPx: parseFloat(lengthToStart),
-                    positionZoneEndPixelsAbsolute: absoluteDistance,
-                    positionZoneEndMetersAbsolute: 0,
-                    color: '#FDEE2F',
-                };
-                
-                const calibrationData = findCalibrationPoint(newDot);
-
-                if (calibrationData) {
-                  const { 
-                    pxAbsPCalibPost, 
-                    mAbsPCalibPost, 
-                    pxAbsPCalibAnt, 
-                    mAbsPCalibAnt 
-                  } = calibrationData;
-
-                  convertPxToMeters(newDot, pxAbsPCalibPost!, mAbsPCalibPost!, pxAbsPCalibAnt!, mAbsPCalibAnt!);
-                };
-
-                setZoneList((prevZoneLength) => {
-                    const updatedZoneLength = [...prevZoneLength, newDot];
-                    if (updatedZoneLength.length === 1) {
-                        updatedZoneLength[0].positionZoneTotalLengthPixels = newDot.positionPx;
-                    } else if (updatedZoneLength.length > 1) {
-                        const lastDot = updatedZoneLength[updatedZoneLength.length - 1];
-                        const secondLastDot = updatedZoneLength[updatedZoneLength.length - 2];
-                        const totalDistance = calculateZoneDistance(secondLastDot, lastDot);
-                        updatedZoneLength[updatedZoneLength.length - 1].positionZoneTotalLengthPixels = totalDistance;
-                    }
-                    return updatedZoneLength;
-                });
-
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    const dx = line.end.x - line.start.x;
-                    const dy = line.end.y - line.start.y;
-                    const ratio = parseFloat(lengthToStart) / line.length;
-                    const pointX = line.start.x + dx * ratio;
-                    const pointY = line.start.y + dy * ratio;
-                    drawPerpendicularLine(ctx, line, pointX, pointY);
-                }
+        if (line.start && line.end) {
+          const lengthToStart = Math.round(
+            Math.sqrt(Math.pow(x - line.start.x, 2) + Math.pow(y - line.start.y, 2))
+          );
+    
+          const totalPreviousLength = lines.slice(0, lineUnderCursorIndex).reduce((sum, prevLine) => {
+            if (prevLine.start && prevLine.end) {
+              return (
+                sum +
+                Math.sqrt(
+                  Math.pow(prevLine.end.x - prevLine.start.x, 2) +
+                  Math.pow(prevLine.end.y - prevLine.start.y, 2)
+                )
+              );
             }
+            return sum;
+          }, 0);
+    
+          const absolutePixelDistance = Math.round(totalPreviousLength + lengthToStart);
+    
+          const isFirstZone = zoneList.length === 0;
+    
+          const startPixels = isFirstZone ? 1 : zoneList[zoneList.length - 1].positionZoneEndPixelsAbsolute + 1;
+    
+          const startMeters = isFirstZone ? (calibrationPoint[0]?.positionMeters ?? 0) + 1 : zoneList[zoneList.length - 1].positionZoneEndMetersAbsolute + 1;
+    
+          const totalPixels = absolutePixelDistance - startPixels;
+    
+          const newDot: Zone = {
+            id: zoneList.length + 1,
+            lineIndex: lineUnderCursorIndex,
+            positionPx: lengthToStart,
+            positionZoneStartPixelsAbsolute: startPixels,
+            positionZoneEndPixelsAbsolute: absolutePixelDistance,
+            positionZoneTotalLengthPixels: totalPixels,
+            positionZoneStartMetersAbsolute: startMeters,
+            positionZoneEndMetersAbsolute: 0,
+            positionZoneTotalLengthMeters: 0,
+            color: '#FDEE2F',
+          };
+    
+          convertZonePxToMeters(newDot);
+    
+          setZoneList((prev) => [...prev, newDot]);
+    
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const dx = line.end.x - line.start.x;
+            const dy = line.end.y - line.start.y;
+            const ratio = lengthToStart / line.length;
+            const pointX = line.start.x + dx * ratio;
+            const pointY = line.start.y + dy * ratio;
+            drawPerpendicularLine(ctx, line, pointX, pointY);
+          }
+    
+          console.log(zoneList);
         }
-        console.log(zoneList);
+      }
     } else {
         finalizeLine( x, y );
 
