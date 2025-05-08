@@ -28,3 +28,14 @@ export interface Zone extends BaseDot{
   positionZoneTotalLengthMeters: number;
   positionZoneTotalLengthPixels: number;
 }
+
+export interface Alarm extends BaseDot{
+  positionMeters: number;
+  zoneID: number;
+}
+
+export interface AlarmCalculationInput {
+  alarmMeters: number;
+  calibrations: Calibration[];
+  zones: Zone[];
+}
