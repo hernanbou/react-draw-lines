@@ -3,8 +3,9 @@ import '../styles/canvas.scss';
 
 import {drawPerpendicularLine, calculateLineLength} from '../utils/calculations';
 import {isMouseOverLine} from '../utils/isMouseOverLine'
-import {Calibration, Zone, Line, ImageDisplayProps} from '../utils/types'
+import {Calibration, Zone, Alarm, Line, ImageDisplayProps, AlarmCalculationInput} from '../utils/types'
 import {saveLines, saveDots, saveZones} from '../utils/savesUtils'
+import locationIcon from '../utils/location_SVG.svg';
 
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
@@ -18,10 +19,16 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [triggerRedraw, setTriggerRedraw] = useState<boolean>(false);
   const [zoneState, setZoneState] = useState<boolean>(false);
+  const [alarmLog, setAlarmLog] = useState<Alarm[]>([]);
+  const [alarmInput, setAlarmInput] = useState<number>(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   const prevLinesLength = useRef<number>(0);
+
+  const alarmImg = new Image();
+  alarmImg.src = locationIcon;
+
   
   const redrawCanvas = (tempLine?: { start: { x: number; y: number }; end: { x: number; y: number }; color: string }) => {
     const canvas = canvasRef.current;
@@ -105,6 +112,25 @@ const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
                 drawPerpendicularLine(ctx, line, pointX, pointY);
             }
         });
+
+        // desenha icone de alarme
+        alarmLog.forEach(alarm => {
+          const line = lines[alarm.lineIndex];
+          if (line?.start && line?.end) {
+            const ratio = alarm.positionPx / line.length;
+            const x = line.start.x + (line.end.x - line.start.x) * ratio;
+            const y = line.start.y + (line.end.y - line.start.y) * ratio;
+        
+            const iconSize = 40;
+            if (alarmImg.complete) {
+              ctx.drawImage(alarmImg, x - iconSize / 2, y - iconSize, iconSize, iconSize);
+            } else {
+              alarmImg.onload = () => {
+                ctx.drawImage(alarmImg, x - iconSize / 2, y - iconSize, iconSize, iconSize);
+              };
+            }
+          }
+        });                
 
         // desenha a linha temporária
         if (tempLine) {
@@ -251,13 +277,9 @@ const convertZonePxToMeters = (Zone: Zone) => {
           }, 0);
     
           const absolutePixelDistance = Math.round(totalPreviousLength + lengthToStart);
-    
           const isFirstZone = zoneList.length === 0;
-    
           const startPixels = isFirstZone ? 1 : zoneList[zoneList.length - 1].positionZoneEndPixelsAbsolute + 1;
-    
           const startMeters = isFirstZone ? (calibrationPoint[0]?.positionMeters ?? 0) + 1 : zoneList[zoneList.length - 1].positionZoneEndMetersAbsolute + 1;
-    
           const totalPixels = absolutePixelDistance - startPixels;
     
           const newDot: Zone = {
@@ -302,6 +324,170 @@ const convertZonePxToMeters = (Zone: Zone) => {
         };
     }
   };
+  
+  function calculateAlarmPixelPosition({
+    alarmMeters,
+    calibrations,
+    zones,
+  }: AlarmCalculationInput): {
+    pixelRelative: number;
+    pixelAbsolute: number;
+    zoneID: number;
+    lineIndex: number;
+  } | null {
+    // 1. Identificar em qual zona o alarme ocorreu
+    const zone = zones.find(
+      z =>
+        alarmMeters >= z.positionZoneStartMetersAbsolute &&
+        alarmMeters <= z.positionZoneEndMetersAbsolute
+    );
+    if (!zone) return null;
+  
+    // 2. Filtrar e ordenar os pontos de calibração da mesma linha
+    const pointsInLine = calibrations
+      .filter(p => p.lineIndex === zone.lineIndex)
+      .sort((a, b) => (a.positionMeters - b.positionMeters));
+  
+    if (pointsInLine.length < 2) {
+      // Nenhum ou apenas um ponto de calibração — usar média global da zona
+      const metersPerPixel =
+        zone.positionZoneTotalLengthMeters / zone.positionZoneTotalLengthPixels;
+      const metersFromStart = alarmMeters - zone.positionZoneStartMetersAbsolute;
+      const pixelOffset = metersFromStart / metersPerPixel;
+      const pixelAbsolute = zone.positionZoneStartPixelsAbsolute + pixelOffset;
+  
+      return {
+        pixelRelative: Math.round(pixelAbsolute),
+        pixelAbsolute,
+        zoneID: zone.id,
+        lineIndex: zone.lineIndex
+      };
+    }
+  
+    // 3. Identificar pontos anteriores e posteriores ao alarme
+    const prev = [...pointsInLine].reverse().find(p => p.positionMeters <= alarmMeters);
+    const next = pointsInLine.find(p => p.positionMeters >= alarmMeters);
+  
+    // 4. Se o alarme estiver ENTRE dois pontos — interpolação padrão
+    if (prev && next && prev.id !== next.id) {
+      const meterDiff = next.positionMeters - prev.positionMeters;
+      const pixelDiff = next.positionPx - prev.positionPx;
+      const metersPerPixel = pixelDiff / meterDiff;
+      const distanceFromPrev = alarmMeters - prev.positionMeters;
+      const pixelAbsolute = prev.positionPx + (distanceFromPrev * metersPerPixel);
+  
+      return {
+        pixelRelative: Math.round(pixelAbsolute),
+        pixelAbsolute,
+        zoneID: zone.id,
+        lineIndex: zone.lineIndex
+      };
+    }
+  
+    // 5. Se o alarme for ANTES do primeiro ponto de calibração
+    const first = pointsInLine[0];
+    if (alarmMeters < first.positionMeters) {
+      const nextAfterFirst = pointsInLine.find(p => p.positionMeters > first.positionMeters);
+      if (!nextAfterFirst) return null;
+  
+      const meterDiff = nextAfterFirst.positionMeters - first.positionMeters;
+      const pixelDiff = nextAfterFirst.positionPx - first.positionPx;
+      const metersPerPixel = pixelDiff / meterDiff;
+      const distance = alarmMeters - first.positionMeters;
+      const pixelAbsolute = first.positionPx + (distance * metersPerPixel);
+  
+      return {
+        pixelRelative: Math.round(pixelAbsolute),
+        pixelAbsolute,
+        zoneID: zone.id,
+        lineIndex: zone.lineIndex
+      };
+    }
+  
+    // 6. Se o alarme for DEPOIS do último ponto de calibração
+    const last = pointsInLine[pointsInLine.length - 1];
+    if (alarmMeters > last.positionMeters) {
+      const prevBeforeLast = [...pointsInLine]
+        .reverse()
+        .find(p => p.positionMeters < last.positionMeters);
+      if (!prevBeforeLast) return null;
+  
+      const meterDiff = last.positionMeters - prevBeforeLast.positionMeters;
+      const pixelDiff = last.positionPx - prevBeforeLast.positionPx;
+      const pixelsPerMeter = pixelDiff / meterDiff;
+      
+      // distância entre o alarme e o último ponto (positivo se estiver depois)
+      const distanceMeters = alarmMeters - last.positionMeters;
+      
+      // mover na mesma direção do último segmento
+      const direction = Math.sign(pixelDiff); // +1 ou -1
+      const pixelOffset = Math.abs(distanceMeters * pixelsPerMeter) * direction;
+      const pixelAbsolute = last.positionPx + pixelOffset;
+  
+      return {
+        pixelRelative: Math.round(pixelAbsolute),
+        pixelAbsolute,
+        zoneID: zone.id,
+        lineIndex: zone.lineIndex
+      };
+    }
+  
+    // 7. Se chegou aqui, não conseguiu calcular
+    return null;
+  }   
+
+  const generateTimestamp = (): number => {
+    const now = new Date();
+  
+    const pad = (num: number): string => num.toString().padStart(2, '0');
+  
+    const day = pad(now.getDate());
+    const month = pad(now.getMonth() + 1);
+    const year = now.getFullYear().toString();
+    const hours = pad(now.getHours());
+    const minutes = pad(now.getMinutes());
+    const seconds = pad(now.getSeconds());
+  
+    return Number(`${day}${month}${year}${hours}${minutes}${seconds}`);
+  };  
+
+  const getRelativePxInLine = (absolutePx: number, lineIndex: number, lines: Line[]) => {
+    const offsetPx = lines
+      .slice(0, lineIndex)
+      .reduce((sum, line) => sum + line.length, 0);
+    return absolutePx - offsetPx;
+  };  
+
+  const handleAlarmTrigger = () => {
+    if (alarmInput <= 0 || !zoneList.length) return;
+  
+    const result = calculateAlarmPixelPosition({
+      alarmMeters: alarmInput,
+      zones: zoneList,
+      calibrations: calibrationPoint
+    });
+  
+    if (!result) {
+      console.warn('Não foi possível determinar a posição do alarme.');
+      return;
+    }
+  
+    const { pixelAbsolute, zoneID, lineIndex } = result;
+    const pixelRelative = getRelativePxInLine(pixelAbsolute, lineIndex, lines);
+    const dateID = generateTimestamp();
+  
+    const newAlarm: Alarm = {
+      id: dateID,
+      lineIndex,
+      positionPx: pixelRelative,
+      positionMeters: alarmInput,
+      zoneID,
+      color: '#FF0000'
+    };
+  
+    setAlarmLog(prev => [...prev, newAlarm]);
+    console.log(alarmLog);
+  };   
    
   const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'z') {
@@ -453,7 +639,14 @@ const convertZonePxToMeters = (Zone: Zone) => {
       redrawCanvas();
       setTriggerRedraw(false);
     }
-  }, [triggerRedraw]);  
+  }, [triggerRedraw]);
+  
+  useEffect(() => {
+    if (alarmLog.length > 0) {
+      redrawCanvas();
+    }
+  }, [alarmLog]);
+  
 
   useEffect(() => {
     fetchMapData();
@@ -540,6 +733,13 @@ const convertZonePxToMeters = (Zone: Zone) => {
                 )}
               </div>
             </div>
+            <input
+              type="number"
+              placeholder="Distância do alarme (m)"
+              value={alarmInput}
+              onChange={(e) => setAlarmInput(Number(e.target.value))}
+            />
+            <button onClick={handleAlarmTrigger}>Disparar Alarme</button>
         </div>
         <button onClick={handleSave}>Salvar Dados do Mapa</button>
     </div>
