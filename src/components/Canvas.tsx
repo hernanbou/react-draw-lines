@@ -324,7 +324,7 @@ const convertZonePxToMeters = (Zone: Zone) => {
         };
     }
   };
-  
+
   function calculateAlarmPixelPosition({
     alarmMeters,
     calibrations,
@@ -335,106 +335,97 @@ const convertZonePxToMeters = (Zone: Zone) => {
     zoneID: number;
     lineIndex: number;
   } | null {
-    // 1. Identificar em qual zona o alarme ocorreu
+    // encontrar a zona correspondente
     const zone = zones.find(
       z =>
         alarmMeters >= z.positionZoneStartMetersAbsolute &&
         alarmMeters <= z.positionZoneEndMetersAbsolute
     );
     if (!zone) return null;
-  
-    // 2. Filtrar e ordenar os pontos de calibração da mesma linha
-    const pointsInLine = calibrations
-      .filter(p => p.lineIndex === zone.lineIndex)
-      .sort((a, b) => (a.positionMeters - b.positionMeters));
-  
-    if (pointsInLine.length < 2) {
-      // Nenhum ou apenas um ponto de calibração — usar média global da zona
+
+    // filtrar pontos de calibração dentro da zona e ordenar
+    const pointsInZone = calibrations
+      .filter(p =>
+        p.lineIndex === zone.lineIndex &&
+        p.positionMeters >= zone.positionZoneStartMetersAbsolute &&
+        p.positionMeters <= zone.positionZoneEndMetersAbsolute
+      )
+      .sort((a, b) => a.positionMeters - b.positionMeters);
+
+    // variáveis de interpolação
+    let startMeter: number | undefined;
+    let endMeter: number | undefined;
+    let startPixel: number | undefined;
+    let endPixel: number | undefined;
+
+    // se não houver pontos de calibração: usa toda a zona
+    if (pointsInZone.length === 0) {
       const metersPerPixel =
         zone.positionZoneTotalLengthMeters / zone.positionZoneTotalLengthPixels;
       const metersFromStart = alarmMeters - zone.positionZoneStartMetersAbsolute;
       const pixelOffset = metersFromStart / metersPerPixel;
       const pixelAbsolute = zone.positionZoneStartPixelsAbsolute + pixelOffset;
-  
+
       return {
         pixelRelative: Math.round(pixelAbsolute),
         pixelAbsolute,
         zoneID: zone.id,
-        lineIndex: zone.lineIndex
+        lineIndex: zone.lineIndex,
       };
     }
-  
-    // 3. Identificar pontos anteriores e posteriores ao alarme
-    const prev = [...pointsInLine].reverse().find(p => p.positionMeters <= alarmMeters);
-    const next = pointsInLine.find(p => p.positionMeters >= alarmMeters);
-  
-    // 4. Se o alarme estiver ENTRE dois pontos — interpolação padrão
-    if (prev && next && prev.id !== next.id) {
-      const meterDiff = next.positionMeters - prev.positionMeters;
-      const pixelDiff = next.positionPx - prev.positionPx;
-      const metersPerPixel = pixelDiff / meterDiff;
-      const distanceFromPrev = alarmMeters - prev.positionMeters;
-      const pixelAbsolute = prev.positionPx + (distanceFromPrev * metersPerPixel);
-  
-      return {
-        pixelRelative: Math.round(pixelAbsolute),
-        pixelAbsolute,
-        zoneID: zone.id,
-        lineIndex: zone.lineIndex
-      };
+
+    // antes do primeiro ponto de calibração
+    if (alarmMeters < pointsInZone[0].positionMeters) {
+      startMeter = zone.positionZoneStartMetersAbsolute;
+      endMeter = pointsInZone[0].positionMeters;
+      startPixel = zone.positionZoneStartPixelsAbsolute;
+      endPixel = pointsInZone[0].positionPx;
     }
-  
-    // 5. Se o alarme for ANTES do primeiro ponto de calibração
-    const first = pointsInLine[0];
-    if (alarmMeters < first.positionMeters) {
-      const nextAfterFirst = pointsInLine.find(p => p.positionMeters > first.positionMeters);
-      if (!nextAfterFirst) return null;
-  
-      const meterDiff = nextAfterFirst.positionMeters - first.positionMeters;
-      const pixelDiff = nextAfterFirst.positionPx - first.positionPx;
-      const metersPerPixel = pixelDiff / meterDiff;
-      const distance = alarmMeters - first.positionMeters;
-      const pixelAbsolute = first.positionPx + (distance * metersPerPixel);
-  
-      return {
-        pixelRelative: Math.round(pixelAbsolute),
-        pixelAbsolute,
-        zoneID: zone.id,
-        lineIndex: zone.lineIndex
-      };
+    // depois do último ponto de calibração
+    else if (alarmMeters > pointsInZone[pointsInZone.length - 1].positionMeters) {
+      startMeter = pointsInZone[pointsInZone.length - 1].positionMeters;
+      endMeter = zone.positionZoneEndMetersAbsolute;
+      startPixel = pointsInZone[pointsInZone.length - 1].positionPx;
+      endPixel = zone.positionZoneEndPixelsAbsolute;
     }
-  
-    // 6. Se o alarme for DEPOIS do último ponto de calibração
-    const last = pointsInLine[pointsInLine.length - 1];
-    if (alarmMeters > last.positionMeters) {
-      const prevBeforeLast = [...pointsInLine]
-        .reverse()
-        .find(p => p.positionMeters < last.positionMeters);
-      if (!prevBeforeLast) return null;
-  
-      const meterDiff = last.positionMeters - prevBeforeLast.positionMeters;
-      const pixelDiff = last.positionPx - prevBeforeLast.positionPx;
-      const pixelsPerMeter = pixelDiff / meterDiff;
-      
-      // distância entre o alarme e o último ponto (positivo se estiver depois)
-      const distanceMeters = alarmMeters - last.positionMeters;
-      
-      // mover na mesma direção do último segmento
-      const direction = Math.sign(pixelDiff); // +1 ou -1
-      const pixelOffset = Math.abs(distanceMeters * pixelsPerMeter) * direction;
-      const pixelAbsolute = last.positionPx + pixelOffset;
-  
-      return {
-        pixelRelative: Math.round(pixelAbsolute),
-        pixelAbsolute,
-        zoneID: zone.id,
-        lineIndex: zone.lineIndex
-      };
+    // entre dois pontos de calibração
+    else {
+      for (let i = 0; i < pointsInZone.length - 1; i++) {
+        const a = pointsInZone[i];
+        const b = pointsInZone[i + 1];
+        if (alarmMeters >= a.positionMeters && alarmMeters <= b.positionMeters) {
+          startMeter = a.positionMeters;
+          endMeter = b.positionMeters;
+          startPixel = a.positionPx;
+          endPixel = b.positionPx;
+          break;
+        }
+      }
     }
-  
-    // 7. Se chegou aqui, não conseguiu calcular
-    return null;
-  }   
+
+    if (
+      startMeter === undefined ||
+      endMeter === undefined ||
+      startPixel === undefined ||
+      endPixel === undefined
+    ) {
+      return null;
+    }
+
+    // interpolação final
+    const meterDiff = endMeter - startMeter;
+    const pixelDiff = endPixel - startPixel;
+    const metersPerPixel = meterDiff !== 0 ? pixelDiff / meterDiff : 0;
+    const distanceFromStart = alarmMeters - startMeter;
+    const pixelAbsolute = startPixel + distanceFromStart * metersPerPixel;
+
+    return {
+      pixelRelative: Math.round(pixelAbsolute),
+      pixelAbsolute,
+      zoneID: zone.id,
+      lineIndex: zone.lineIndex,
+    };
+  }
 
   const generateTimestamp = (): number => {
     const now = new Date();
@@ -732,14 +723,14 @@ const convertZonePxToMeters = (Zone: Zone) => {
                   ))
                 )}
               </div>
-            </div>
-            <input
+               <input
               type="number"
               placeholder="Distância do alarme (m)"
               value={alarmInput}
               onChange={(e) => setAlarmInput(Number(e.target.value))}
             />
             <button onClick={handleAlarmTrigger}>Disparar Alarme</button>
+            </div>
         </div>
         <button onClick={handleSave}>Salvar Dados do Mapa</button>
     </div>
