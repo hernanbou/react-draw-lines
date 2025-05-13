@@ -43,6 +43,15 @@ maps = [
         'line_list': [],
         'point_list': [],
         'zone_list' : []
+    },
+    {
+        'id': 5,
+        'owner': 'Victor Diago',
+        'name': 'Alfa Sense',
+        'original_image': 'img/farm_6.jpeg',
+        'line_list': [],
+        'point_list': [],
+        'zone_list' : []
     }
 ]
 
