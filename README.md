@@ -16,7 +16,7 @@ Este guia descreve como configurar o ambiente Python local com `pyenv`, `pipx` e
 Utilizamos o `pyenv` para definir a versão do Python a ser usada neste projeto:
 
 ```bash
-pyenv local 3.12.10
+pyenv local 3.13.3
 ```
 
 Isso cria ou atualiza o arquivo `.python-version` com a versão escolhida.
@@ -25,7 +25,7 @@ Verifique se a versão está correta:
 
 ```bash
 python3 -V
-# Saída esperada: Python 3.12.10
+# Saída esperada: Python 3.13.3
 ```
 
 ---
