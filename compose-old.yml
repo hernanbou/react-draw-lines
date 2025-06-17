@@ -1,0 +1,50 @@
+services:
+  frontend:
+    build:
+      context: ./react-draw-lines
+      dockerfile: Dockerfile.dev
+    container_name: react-frontend
+    ports:
+      - 3000:3000
+    networks:
+      - maps
+    volumes:
+      - ./react-draw-lines:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_URL=http://localhost:5000
+      # - NODE_ENV=production
+    command: npm start
+    develop:
+      watch:
+        - path: ./react-draw-lines
+          target: /app
+          action: sync
+          ignore:
+            - node_modules
+  backend:
+    build:
+      context: ./Maps-FlaskAPI
+      dockerfile: Dockerfile
+    container_name: flask-backend
+    ports:
+      - 5000:5000
+    networks:
+      - maps
+    volumes:
+      - ./Maps-FlaskAPI:/app
+    command: flask run -h 0.0.0.0 -p 5000 --debug
+    develop:
+      watch:
+        - path: ./Maps-FlaskAPI
+          target: /app
+          action: sync
+          ignore:
+            - __pycache__
+            - '*.pyc'
+
+networks:
+  maps:
+    name: sistema-maps
+    driver: bridge

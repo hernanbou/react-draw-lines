@@ -1,43 +1,41 @@
-from typing import List
-
-from pydantic import BaseModel
-
-from backend.shared.schemas import BaseDot
+from marshmallow import Schema, fields
 
 
-class Point(BaseModel):
-    x: float
-    y: float
+class PointSchema(Schema):
+    x = fields.Float(required=True)
+    y = fields.Float(required=True)
 
 
-class Line(BaseModel):
-    start: Point
-    end: Point
-    length: float
-    color: str
-    index: int
+class LineSchema(Schema):
+    start = fields.Nested(PointSchema, required=True)
+    end = fields.Nested(PointSchema, required=True)
+    length = fields.Float(required=True)
+    color = fields.Str(required=True)
+    index = fields.Int(required=True)
 
 
-class Calibration(BaseDot):
-    positionMeters: float
+class BaseDotSchema(Schema):
+    id = fields.Int(required=False)
+    name = fields.Str(required=False)
 
 
-class Zone(BaseDot):
-    positionZoneEndPixelsAbsolute: float
-    positionZoneStartPixelsAbsolute: float
-    positionZoneEndMetersAbsolute: float
-    positionZoneStartMetersAbsolute: float
-    positionZoneTotalLengthMeters: float
-    positionZoneTotalLengthPixels: float
+class CalibrationSchema(BaseDotSchema):
+    positionMeters = fields.Float(required=True)
 
 
-class Alarm(BaseDot):
-    positionMeters: float
-    zoneID: float
+class ZoneSchema(BaseDotSchema):
+    positionZoneEndPixelsAbsolute = fields.Float(required=True)
+    positionZoneStartPixelsAbsolute = fields.Float(required=True)
+    positionZoneEndMetersAbsolute = fields.Float(required=True)
+    positionZoneStartMetersAbsolute = fields.Float(required=True)
+    positionZoneTotalLengthMeters = fields.Float(required=True)
+    positionZoneTotalLengthPixels = fields.Float(required=True)
 
 
-LINES = List[Line]
+class AlarmSchema(BaseDotSchema):
+    positionMeters = fields.Float(required=True)
+    zoneID = fields.Float(required=True)
 
 
-class PutLinePayload(BaseModel):
-    lines: LINES
+class PutLinePayloadSchema(Schema):
+    lines = fields.List(fields.Nested(LineSchema), required=True)

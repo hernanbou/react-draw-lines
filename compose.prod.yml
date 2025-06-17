@@ -1,0 +1,24 @@
+services:
+  client:
+    build:
+      context: ./react-draw-lines
+      dockerfile: Dockerfile
+    container_name: react-nginx
+    ports:
+      - 80:80
+    networks:
+      - maps
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./Maps-FlaskAPI
+    container_name: flask-backend
+    networks:
+      - maps
+    command: flask run -h 0.0.0.0 -p 5000
+
+networks:
+  maps:
+    driver: bridge

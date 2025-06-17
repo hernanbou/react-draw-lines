@@ -1,12 +1,12 @@
-from pydantic import BaseModel
+from marshmallow import Schema, fields
 
 
-class BaseDot(BaseModel):
-    id: int
-    lineIndex: int
-    positionPx: float
-    color: str
+class BaseDotSchema(Schema):
+    id = fields.Int(required=True)
+    lineIndex = fields.Int(required=True)
+    positionPx = fields.Float(required=True)
+    color = fields.Str(required=True)
 
 
-class DefaultMessageResponse(BaseModel):
-    message: str
+class DefaultMessageResponseSchema(Schema):
+    message = fields.Str(required=True)

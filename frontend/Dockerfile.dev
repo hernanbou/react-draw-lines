@@ -1,0 +1,13 @@
+FROM node:22.12.0-alpine
+
+# Diretório de trabalho dentro do container
+WORKDIR /app
+
+# Copia apenas os arquivos de dependência primeiro (cache eficiente)
+COPY package*.json ./
+
+# Instala as dependências
+RUN npm install
+
+# Copia o restante do projeto
+COPY . .

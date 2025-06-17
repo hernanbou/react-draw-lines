@@ -1,14 +1,11 @@
-from http import HTTPMethod, HTTPStatus
+from http import HTTPStatus
 
-from flask import Blueprint, jsonify
-from flask_pydantic_spec import Response
-from pydantic import ValidationError
+from flask.views import MethodView
+from flask_smorest import Blueprint, abort
 
-from backend.routes.maps.schemas import LINES, PutLinePayload
-from backend.shared.schemas import DefaultMessageResponse
-from backend.spec import api
+from .schemas import PutLinePayloadSchema
 
-maps = Blueprint('maps', __name__, url_prefix='/maps')
+maps = Blueprint('maps', 'maps', url_prefix='/maps')
 
 
 maps_db = [
@@ -60,49 +57,118 @@ maps_db = [
 ]
 
 
-@maps.errorhandler(ValidationError)
-def handle_maps_validation_error(error):
-    print('ERROR HANDLER')
-    return jsonify({'msg': 'Deu errinho'}), HTTPStatus.BAD_REQUEST
-    ...
+# @maps.route(
+#     '/',
+# )
+# @api.validate(resp=Response(HTTP_200=None))
+# def maps_root():
+#     try:
+#         print('try')
+#         # raise Exception('ERRORING')
+#         return jsonify('Ok', HTTPStatus.OK)
+#     except Exception as error:
+#         print(f'Exception occurred {error}')
+#         return jsonify('Not Ok', HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
-@maps.route(
-    '/',
-)
-@api.validate(resp=Response(HTTP_200=None))
-def maps_root():
-    try:
-        print('try')
-        # raise Exception('ERRORING')
-        return jsonify('Ok', HTTPStatus.OK)
-    except Exception as error:
-        print(f'Exception occurred {error}')
-        return jsonify('Not Ok', HTTPStatus.INTERNAL_SERVER_ERROR)
+# @maps.route('/<int:map_id>/line', methods=[HTTPMethod.PUT.value])
+# @api.validate(
+#     body=Request(PutLinePayload),
+#     resp=Response(HTTP_200=None, validate=False),
+# )
+# def create_line(map_id: int):
+#     body: PutLinePayload = request.json
+#     # var = PutLinePayload.model_dump_json(**request.get_json())
+#     print(f'Teste -> {body}')
+#     if not any(m['id'] == map_id for m in maps_db):
+#         return jsonify({
+#             'error': 'Mapa não encontrado',
+#             'message': f'Não foi possível encontrar um mapa com ID: {map_id}',
+#         }), HTTPStatus.NOT_FOUND
+#     print(map_id, body)
+#     return jsonify(
+#         {'msg': 'ok'},
+#     ), 200
 
 
-@maps.route('/<int:line_id>/line', methods=[HTTPMethod.PUT.value])
-@api.validate(body=PutLinePayload, resp=Response(HTTP_200=None))
-def create_line(
-    line_id: int,
-):
-    try:
-        print(line_id, PutLinePayload.lines)
-        return jsonify(
-            {'msg': 'ok'},
-        ), 200
-    except Exception as e:
-        print('EXECPTIONADO', e)
-        return jsonify({'msg': 'not ok'}), HTTPStatus.BAD_REQUEST
+# @maps.route('/<int:map_id>/line', methods=[HTTPMethod.GET.value])
+# @api.validate(resp=Response(HTTP_200=None, HTTP_404=None))
+# def get_map_lines(map_id: int):
+#     if map_id < 0 or map_id > len(maps_db):
+#         abort(HTTPStatus.NOT_FOUND, 'testes')
+#     found_map = next((n for n in maps_db if n.get('id') == map_id), None)
+#     if found_map is None:
+#         return jsonify({
+#             'message': (
+#                 f"We couldn't find any map with map_id: {map_id}"
+#                 ', try again with a different map_id'
+#             )
+#         }), HTTPStatus.NOT_FOUND
+#     return jsonify({
+#         'message': f'We have found {len(found_map["lines"])} lines',
+#         'data': {'lines': found_map['lines']},
+#     }), HTTPStatus.OK
 
 
-@maps.route('/<int:id>/line', methods=[HTTPMethod.GET.value])
-@api.validate(resp=Response(HTTP_200=LINES, HTTP_404=DefaultMessageResponse))
-def get_map_lines(id: int):
-    map = next((m for m in maps_db if m['id'] == id), None)
-    if map is None:
-        return jsonify({'message': 'There is no lines in the selected map'})
-    return jsonify({
-        'message': f'We have found {len(map["lines"])} lines',
-        'data': map['lines'],
-    })
+@maps.route('/')
+class MapsRootResource(MethodView):
+    @maps.response(HTTPStatus.OK)
+    def get(self):
+        """Root endpoint for Maps"""
+        try:
+            print('try')
+            return {'message': 'Ok', 'data': maps_db}
+        except Exception as error:
+            print(f'Exception occurred {error}')
+            abort(HTTPStatus.INTERNAL_SERVER_ERROR, message='Unexpected error')
+
+
+@maps.route('/<int:map_id>')
+class MapsRootId(MethodView):
+    @maps.response(HTTPStatus.OK)
+    @maps.alt_response(HTTPStatus.NOT_FOUND, description='Map not found')
+    def get(self, map_id):
+        """Endpoint to get more info about a specific map"""
+        try:
+            print('MapsRootId')
+            found_map = next((m for m in maps_db if m['id'] == map_id), None)
+            if not found_map:
+                abort(
+                    HTTPStatus.NOT_FOUND, message=f'Map ID {map_id} not found'
+                )
+            return {
+                'message': f'Map found: {found_map["name"]}',
+                'data': found_map,
+            }
+        except Exception as error:
+            print(f'Exception occurred {error}')
+            abort(HTTPStatus.INTERNAL_SERVER_ERROR, message='Unexpected error')
+
+
+@maps.route('/<int:map_id>/line')
+class MapLineResource(MethodView):
+    @maps.response(HTTPStatus.OK)
+    @maps.alt_response(HTTPStatus.NOT_FOUND, description='Map not found')
+    def get(self, map_id):
+        """Get lines for a map"""
+        found_map = next((m for m in maps_db if m['id'] == map_id), None)
+        if not found_map:
+            abort(HTTPStatus.NOT_FOUND, message=f'Map ID {map_id} not found')
+
+        return {
+            'message': f'We have found {len(found_map["lines"])} lines',
+            'data': {'lines': found_map['lines']},
+        }
+
+    @maps.arguments(PutLinePayloadSchema)
+    @maps.response(HTTPStatus.OK)
+    def put(self, body, map_id):
+        """Create lines for a map"""
+        print(f'Body: {body}')
+        found_map = next((m for m in maps_db if m['id'] == map_id), None)
+        if not found_map:
+            abort(HTTPStatus.NOT_FOUND, message=f'Map ID {map_id} not found')
+
+        # Exemplo: salvar no "banco de dados"
+        found_map['lines'] = body['lines']
+        return {'message': 'Lines saved successfully'}
