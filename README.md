@@ -94,4 +94,4 @@ Esse comando irá instalar todas as dependências listadas no `pyproject.toml`.
 
 ---
 
-
+[Documentação sobre a arquitetura esperada para o projeto](https://cloud.alfasense.com.br/s/9eTdMZ9ccxFgTsP?dir=undefined&openfile=115403)
