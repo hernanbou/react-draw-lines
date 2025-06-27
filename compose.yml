@@ -1,15 +1,15 @@
 services:
   frontend:
     build:
-      context: ./react-draw-lines
+      context: ./frontend
       dockerfile: Dockerfile.dev
-    container_name: react-frontend
+    container_name: mapas-frontend
     ports:
       - 3000:3000
     networks:
       - maps
     volumes:
-      - ./react-draw-lines:/app
+      - ./frontend:/app
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
@@ -18,14 +18,16 @@ services:
 
   backend:
     build:
-      context: ./Maps-FlaskAPI
-    container_name: flask-backend
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: mapas-backend
     ports:
       - 5000:5000
     networks:
       - maps
     volumes:
-      - ./Maps-FlaskAPI:/app
+      - ./backend:/app/backend
+      - /mnt/SDCARD/maps.db:/app/backend/database/maps.db
     command: flask run -h 0.0.0.0 -p 5000 --debug
 
 networks:
