@@ -11,12 +11,11 @@ requires-python = ">=3.13,<4.0"
 dependencies = [
     "flask (>=3.1.1,<4.0.0)",
     "flask-cors (>=6.0.0,<7.0.0)",
-    "pydantic (>=2.11.5,<3.0.0)",
-    "flask-pydantic-spec (>=0.8.5,<0.9.0)",
     "marshmallow (>=4.0.0,<5.0.0)",
     "flask-smorest (>=0.46.1,<0.47.0)",
+    "marshmallow-sqlalchemy (>=1.4.2,<2.0.0)",
+    "mypy (>=1.16.1,<2.0.0)",
 ]
-
 
 
 [build-system]
@@ -32,11 +31,11 @@ taskipy = "^1.14.1"
 [tool.ruff]
 line-length = 79
 extend-exclude = ['migrations', 'frontend', 'backend/migrations']
-ignore = ["PLR6301"]
 
 [tool.ruff.lint]
 preview = true
 select = ['I','F','E','W', 'PL', 'PT']
+ignore = ["PLR6301"]
 
 [tool.ruff.format]
 preview = true
@@ -56,3 +55,4 @@ run = 'flask --app backend/wsgi.py run -h 0.0.0.0 -p 5000 --debug'
 pre_test = 'task lint' # Executa antes do test, caso de certo roda o test
 test = 'pytest -s -x --cov=backend -vv'
 post_test = 'coverage html' # Executa caso o test funcione
+requirements = "poetry export --without-hashes -f requirements.txt | sed 's/;.*//' > backend/requirements.txt"
