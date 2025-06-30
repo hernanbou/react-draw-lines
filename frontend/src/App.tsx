@@ -3,6 +3,7 @@ import MapSelector from "./pages/MapSelector";
 import Canvas from "./components/Canvas";
 import './styles/global.scss'
 import './styles/app.scss'
+import { api } from "./services/api";
 
 interface Map {
   id: number;
@@ -11,15 +12,22 @@ interface Map {
   image: string;
 }
 
-const App: React.FC = () => {
+const App = () => {
   const [maps, setMaps] = useState<Map[]>([]);
   const [selectedMapId, setSelectedMapId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/maps")
-      .then((response) => response.json())
-      .then((data) => setMaps(data))
-      .catch((error) => console.error("Erro ao carregar mapas:", error));
+    (async () => {
+      try {
+        const response = await api.get("/maps")
+        const data = await response.data.data
+
+        setMaps(data)
+      } catch (error) {
+        console.error("Erro ao carregar mapas:", error)
+      }
+
+    })()
   }, []);
 
   const selectedMap = maps.find((map) => map.id === selectedMapId);

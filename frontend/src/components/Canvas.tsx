@@ -6,6 +6,8 @@ import {isMouseOverLine} from '../utils/isMouseOverLine'
 import {Calibration, Zone, Alarm, Line, ImageDisplayProps, AlarmCalculationInput} from '../utils/types'
 import {saveLines, saveDots, saveZones} from '../utils/savesUtils'
 import locationIcon from '../utils/location_SVG.svg';
+import { api } from '../services/api';
+
 
 const Canvas: React.FC<ImageDisplayProps> = ({ mapID }) => {
 
@@ -572,51 +574,58 @@ const convertZonePxToMeters = (Zone: Zone) => {
   const fetchMapData = useCallback(async () => {
     try {
       console.log('Fetching map data...');
-      const response = await fetch(`http://localhost:5000/maps/${mapID}/original_image`);
-      if (!response.ok) {
+      const response = await api.get(`/maps/${mapID}`);
+      if (response.statusText.toLowerCase() !== "ok") {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
-      console.log('Map image fetched:', imageUrl);
-      setImageUrl(imageUrl);
+      const {data} = response.data;
+      const {image, lines_list,calibration_list,zone_list} = data
+      const imageUrl = new URL(
+        `http://localhost:5000/static/${image}`
+      );
+      
+      console.log('Map image fetched:', imageUrl.toString());
+      setImageUrl(imageUrl.toString());
+      setLines(lines_list)
+      setCalibrationPoint(calibration_list)
+      setZoneList(zone_list)
     } catch (error) {
       console.error('Erro ao buscar dados do mapa', error);
     }
-  }, [mapID, setImageUrl]);  
+  }, [mapID, setImageUrl, setLines, setCalibrationPoint, setZoneList]);  
 
-  const fetchLineList = useCallback(async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/maps/${mapID}/line_list`);
-      const lineData: Line[] = await response.json();
+  // const fetchLineList = useCallback(async () => {
+  //   try {
+  //     const response = await api.get(`/maps/${mapID}/line_list`);
+  //     const lineData: Line[] = await response.data;
 
-      setLines(lineData);
-    } catch (error) {
-      console.error('Erro ao buscar lista de vetores', error);
-    }
-  }, [mapID, setLines]);
+  //     setLines(lineData);
+  //   } catch (error) {
+  //     console.error('Erro ao buscar lista de vetores', error);
+  //   }
+  // }, [mapID, setLines]);
 
-  const fetchPointList = useCallback(async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/maps/${mapID}/point_list`);
-      const pointData: Calibration[] = await response.json();
+  // const fetchPointList = useCallback(async () => {
+  //   try {
+  //     const response = await api.get(`/maps/${mapID}/point_list`);
+  //     const pointData: Calibration[] = await response.data;
       
-      setCalibrationPoint(pointData);
-    } catch (error) {
-      console.error('Erro ao buscar lista de pontos', error);
-    }
-  }, [mapID, setCalibrationPoint]);
+  //     setCalibrationPoint(pointData);
+  //   } catch (error) {
+  //     console.error('Erro ao buscar lista de pontos', error);
+  //   }
+  // }, [mapID, setCalibrationPoint]);
   
-  const fetchZoneList = useCallback(async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/maps/${mapID}/zone_list`);
-      const zoneData: Zone[] = await response.json();
+  // const fetchZoneList = useCallback(async () => {
+  //   try {
+  //     const response = await api.get(`/maps/${mapID}/zone_list`);
+  //     const zoneData: Zone[] = await response.data;
       
-      setZoneList(zoneData);
-    } catch (error) {
-      console.error('Erro ao buscar lista de pontos', error);
-    }
-  }, [mapID, setZoneList]); 
+  //     setZoneList(zoneData);
+  //   } catch (error) {
+  //     console.error('Erro ao buscar lista de pontos', error);
+  //   }
+  // }, [mapID, setZoneList]); 
 
   const resetStates = () => {
     setLines([]);
@@ -641,11 +650,11 @@ const convertZonePxToMeters = (Zone: Zone) => {
 
   useEffect(() => {
     fetchMapData();
-    fetchLineList();
-    fetchPointList();
-    fetchZoneList();
+    // fetchLineList();
+    // fetchPointList();
+    // fetchZoneList();
     resetStates();
-  }, [fetchMapData, fetchLineList, fetchPointList, fetchZoneList]);    
+  }, [fetchMapData]);    
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
