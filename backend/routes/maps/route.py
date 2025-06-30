@@ -76,7 +76,6 @@ class MapsRootId(MethodView):
     def get(self, map_id):
         """Endpoint to get more info about a specific map"""
         try:
-            print('MapsRootId')
             found_map = next((m for m in maps_db if m['id'] == map_id), None)
             if not found_map:
                 abort(
