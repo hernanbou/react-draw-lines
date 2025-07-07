@@ -16,4 +16,5 @@ else:
 class Settings(BaseSettings):
     ENVIRONMENT: Optional[str] = ENVIRONMENT
     DATABASE_URL: str = ''
+    ORIGIN_URL: str = ''
     model_config = model_config
