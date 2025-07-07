@@ -3,7 +3,7 @@ from http import HTTPStatus
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 
-users = Blueprint('users', 'users', url_prefix='/users')
+users = Blueprint('Users', 'users', url_prefix='/users')
 
 
 @users.route('/')

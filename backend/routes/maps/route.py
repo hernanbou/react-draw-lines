@@ -5,7 +5,7 @@ from flask_smorest import Blueprint, abort
 
 from .schemas import PutLinePayloadSchema
 
-maps = Blueprint('maps', 'maps', url_prefix='/maps')
+maps = Blueprint('Maps', 'maps', url_prefix='/maps')
 
 
 maps_db = [
