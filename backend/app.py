@@ -3,13 +3,16 @@ from typing import Any
 from flask import Flask
 from flask_cors import CORS
 from flask_smorest import Api
-from werkzeug.exceptions import HTTPException
+from flask_smorest.error_handler import HTTPException
 
 from backend.routes.auth.route import auth
 from backend.routes.maps.route import maps
 from backend.routes.users.route import users
 from backend.settings import Settings
 from backend.shared.error_handlers import custom_error_handler
+from backend.shared.schemas import (
+    ErrorResponseSchema,
+)
 
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:
@@ -22,7 +25,6 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         origins=[Settings().ORIGIN_URL],
         allow_headers=['Content-Type'],
     )
-
     api = Api(app)
 
     # Registro de Erros Customizados
@@ -35,7 +37,34 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
 
     @app.route('/', methods=['GET'])
     def home():
-        return {'message': 'Server Working Fine'}
+        print('teste', Settings().DATABASE_URL)
+        return {'message': f'Server Working Fine {Settings().DATABASE_URL}'}
 
     # Registro das configurações de documentação
+    with app.app_context():
+        api_ext = app.extensions['flask-smorest']['apis']['']['ext_obj']
+
+        spec = api_ext.spec
+        if 'ErrorResponse' in spec.components.schemas:
+            spec.components.schemas.pop('ErrorResponse')
+
+        spec.components.schema('ErrorResponse', schema=ErrorResponseSchema)
+
+        if 'DEFAULT_ERROR' in spec.components.responses:
+            spec.components.responses.pop('DEFAULT_ERROR')
+
+        spec.components.response(
+            'DEFAULT_ERROR',
+            {
+                'description': 'Erro de validação.',
+                'content': {
+                    'application/json': {
+                        'schema': {
+                            '$ref': '#/components/schemas/ErrorResponse'
+                        }
+                    }
+                },
+            },
+        )
+
     return app
