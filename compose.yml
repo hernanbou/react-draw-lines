@@ -28,6 +28,10 @@ services:
     volumes:
       - ./backend:/app/backend
       - /mnt/SDCARD/maps.db:/app/backend/database/maps.db
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:///backend/database/maps.db
     command: flask run -h 0.0.0.0 -p 5000 --debug
 
 networks:
