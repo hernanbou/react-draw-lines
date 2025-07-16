@@ -17,4 +17,5 @@ class Settings(BaseSettings):
     ENVIRONMENT: Optional[str] = ENVIRONMENT
     DATABASE_URL: str = ''
     ORIGIN_URL: str = ''
+    PASSWORD_SALT: str = ''
     model_config = model_config
