@@ -4,12 +4,15 @@ from flask import Flask
 from flask_cors import CORS
 from flask_smorest import Api
 from flask_smorest.error_handler import HTTPException
+from webargs import ValidationError
 
 from backend.routes.auth.route import auth
 from backend.routes.maps.route import maps
 from backend.routes.users.route import users
 from backend.settings import Settings
-from backend.shared.error_handlers import custom_error_handler
+from backend.shared.error_handlers import (
+    unified_error_handler,
+)
 from backend.shared.schemas import (
     ErrorResponseSchema,
 )
@@ -28,7 +31,9 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     api = Api(app)
 
     # Registro de Erros Customizados
-    app.register_error_handler(HTTPException, custom_error_handler)
+    app.register_error_handler(HTTPException, unified_error_handler)
+    app.register_error_handler(ValidationError, unified_error_handler)
+    app.register_error_handler(Exception, unified_error_handler)
 
     # Registro das rotas
     api.register_blueprint(auth)
