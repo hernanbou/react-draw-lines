@@ -5,13 +5,15 @@ from marshmallow import (
 )
 from marshmallow.decorators import validates
 
+from backend.routes.users.schemas import UserResponseFields
+
 MIN_PASSWORD_LENGTH = 5
 MIN_USERNAME_LENGTH = 4
 
 
 class AuthLoginInput(Schema):
-    password = fields.Str(required=True)
     username = fields.Str(required=True)
+    password = fields.Str(required=True)
     errors = {}
 
     @validates('password')
@@ -30,5 +32,5 @@ class AuthLoginInput(Schema):
 
 
 class AuthLoginOutput(Schema):
-    username = fields.Str(required=True)
-    id = fields.UUID(required=True)
+    message = fields.Str(required=True)
+    data = fields.Nested(UserResponseFields, required=True)
