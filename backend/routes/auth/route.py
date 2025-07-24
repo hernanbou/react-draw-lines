@@ -41,6 +41,7 @@ class AuthLoginResource(MethodView):
             login_user=login_user, found_user=found_user
         ):
             abort(HTTPStatus.UNAUTHORIZED, description='Credênciais inválidas')
+        # TODO -> ADICIONAR MULTILINGUAGEM
         return {
             'message': 'Usuário conectado com sucesso',
             'data': {

@@ -63,6 +63,7 @@ class MapsRootResource(MethodView):
     def get(self):
         """Root endpoint for Maps"""
         try:
+            # TODO -> ADICIONAR MULTILINGUAGEM
             return {'message': 'Ok', 'data': maps_db}
         except Exception as error:
             print(f'Exception occurred {error}')
@@ -81,6 +82,7 @@ class MapsRootId(MethodView):
                 abort(
                     HTTPStatus.NOT_FOUND, message=f'Map ID {map_id} not found'
                 )
+            # TODO -> ADICIONAR MULTILINGUAGEM
             return {
                 'message': f'Map found: {found_map["name"]}',
                 'data': found_map,
@@ -97,9 +99,11 @@ class MapLineResource(MethodView):
     def get(self, map_id):
         """Get lines for a map"""
         found_map = next((m for m in maps_db if m['id'] == map_id), None)
+        # TODO -> ADICIONAR MULTILINGUAGEM
         if not found_map:
             abort(HTTPStatus.NOT_FOUND, message=f'Map ID {map_id} not found')
 
+        # TODO -> ADICIONAR MULTILINGUAGEM
         return {
             'message': f'We have found {len(found_map["lines"])} lines',
             'data': {'lines': found_map['lines']},
@@ -116,4 +120,5 @@ class MapLineResource(MethodView):
 
         # Exemplo: salvar no "banco de dados"
         found_map['lines'] = body['lines']
+        # TODO -> ADICIONAR MULTILINGUAGEM
         return {'message': 'Lines saved successfully'}

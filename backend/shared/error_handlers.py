@@ -27,7 +27,7 @@ def flatten_error_messages(errors: dict[str, Any]) -> dict[str, list[str]]:
 
 
 def unified_error_handler(error: Any) -> ResponseReturnValue:
-    """Handler para validação, HTTPException e erros genéricos."""
+    """Handler for validation, HTTPException e generic errors."""
     payload = {
         'code': HTTPStatus.INTERNAL_SERVER_ERROR,
         'status': 'Internal Server Error',
